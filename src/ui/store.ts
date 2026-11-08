@@ -5,6 +5,7 @@
 
 import { type Accessor, batch, signal, type Signal } from "nsh";
 import { Spotify, type Health, type Player } from "spotish/native";
+import { hydrate } from "./cache";
 
 /** A page of the main view. */
 export type Route = { name: "home" } | { name: "search" } | { name: "collection"; uri: string };
@@ -97,6 +98,7 @@ function label(name: ControlName): string {
 
 export function createStore(): Store {
   const spotify = new Spotify();
+  void hydrate();
 
   const player = signal<Player>(spotify.player ?? EMPTY_PLAYER);
   const health = signal<Health>(spotify.health ?? { status: "starting", error: null });

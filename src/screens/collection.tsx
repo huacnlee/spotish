@@ -1,8 +1,9 @@
 // A collection's page: a playlist, album, artist or Liked Songs, with its
 // header, a play button and its tracks in a virtualized, recycling list.
 
-import { List, resource, Text, View, windowSize } from "nsh";
+import { List, Text, View, windowSize } from "nsh";
 import { store } from "../ui/store";
+import { cached } from "../ui/cache";
 import { Cover, PlayButton, SectionTitle } from "../ui/controls";
 import { CardGrid, PageMessage, TrackHeader, TrackRow } from "./common";
 import type { Collection as CollectionData } from "../ui/types";
@@ -22,20 +23,21 @@ function hrefOf(uri: string): string {
 }
 
 export function Collection(props: { uri: string }) {
-  const data = resource(
-    () => ({ uri: props.uri, epoch: store.epoch() }),
-    (src) => {
-      const kind = kindOf(src.uri);
-      if (kind === "album") return store.spotify.album(src.uri) as Promise<CollectionData>;
-      if (kind === "artist") return store.spotify.artist(src.uri) as Promise<CollectionData>;
+  // Cache-first: a revisited collection shows at once and revalidates behind.
+  const data = cached<CollectionData>(
+    () => props.uri,
+    (uri) => {
+      const kind = kindOf(uri);
+      if (kind === "album") return store.spotify.album(uri) as Promise<CollectionData>;
+      if (kind === "artist") return store.spotify.artist(uri) as Promise<CollectionData>;
       if (kind === "collection") return store.spotify.likedSongs() as Promise<CollectionData>;
-      return store.spotify.playlist(src.uri) as Promise<CollectionData>;
+      return store.spotify.playlist(uri) as Promise<CollectionData>;
     },
   );
   return (
     <View class="flex-1">
       <If
-        when={data()}
+        when={data.data()}
         else={
           <If when={data.error()} else={<PageMessage title="Loading" />}>
             <PageMessage title="This page didn't load" detail={String(data.error())} />

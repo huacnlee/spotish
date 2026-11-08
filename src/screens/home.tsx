@@ -1,6 +1,7 @@
 // The home page: a shader-lit header, then Spotify's sections of the day.
 
 import { resource, Scroll, Text, View } from "nsh";
+import { cached } from "../ui/cache";
 import { store } from "../ui/store";
 import { CardRow, PageMessage } from "./common";
 import { Ambient, coverColors } from "../ui/shader";
@@ -9,7 +10,7 @@ import { isTerminal } from "../ui/controls";
 import type { Home as HomeData } from "../ui/types";
 
 export function Home() {
-  const home = resource(store.epoch, () => store.spotify.home() as Promise<HomeData>);
+  const home = cached<HomeData>(() => "home", () => store.spotify.home() as Promise<HomeData>);
   // The ambient tint comes from the playing cover's own extracted color.
   const tint = resource(
     () => store.player().artwork,
@@ -29,10 +30,10 @@ export function Home() {
         </If>
         <View class="gap-8 px-3 pb-8 pt-16">
           <Text class="px-3 text-4xl font-extrabold text-foreground" style={enter("fadeInUp", 0)}>
-            {home()?.greeting || "Home"}
+            {home.data()?.greeting || "Home"}
           </Text>
           <If
-            when={home()}
+            when={home.data()}
             else={
               <If when={home.error()} else={<PageMessage title="Loading" detail="Fetching what's new for you…" />}>
                 <PageMessage title="Home didn't load" detail={String(home.error())} />
