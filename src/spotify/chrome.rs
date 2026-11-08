@@ -38,24 +38,23 @@ pub fn import_session(target: &Path) {
     let Some(source) = std::env::var_os("SPOTISH_PROFILE").filter(|p| !p.is_empty()).map(PathBuf::from) else {
         return;
     };
-    // Only import once: if Spotish already has cookies, keep its own session.
+    // Sync every start while SPOTISH_PROFILE is set, so the reused login always
+    // matches the source browser (even if Spotish ran before).
     let target_default = target.join("Default");
-    if target_default.join("Cookies").exists() || target_default.join("Network").join("Cookies").exists() {
-        return;
-    }
     if std::fs::create_dir_all(&target_default).is_err() {
         return;
     }
     let source_default = source.join("Default");
     let mut copied = false;
-    for cookies in ["Cookies", "Network/Cookies"] {
+    // Cookies, with the SQLite sidecars so a live source copies consistently.
+    for cookies in ["Cookies", "Cookies-wal", "Cookies-shm", "Network/Cookies", "Network/Cookies-wal", "Network/Cookies-shm"] {
         let from = source_default.join(cookies);
         if from.exists() {
             let to = target_default.join(cookies);
             if let Some(parent) = to.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            if std::fs::copy(&from, &to).is_ok() {
+            if std::fs::copy(&from, &to).is_ok() && cookies.ends_with("Cookies") {
                 copied = true;
             }
         }
