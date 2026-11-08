@@ -315,7 +315,7 @@ function MenuEntries(props: { name: string; image: string }) {
         <Separator />
       </If>
       <If when={!premium()}>
-        <Entry icon="sparkles" label="Premium" external onSelect={openPremium} />
+        <Entry icon="crown" label="Premium" external onSelect={openPremium} />
       </If>
       <Entry icon="music" label="Spotify" external onSelect={() => openExternal(SPOTIFY_URL)} />
       <Separator />

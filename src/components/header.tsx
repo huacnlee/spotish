@@ -26,7 +26,7 @@ export function AccountAction() {
         {/* A narrow window: the same action as an icon, so the header
             never runs out of room. */}
         <If when={layout() === "desktop" && windowSize().width < 640} else={<ActionButton label="Premium" onPress={openPremium} />}>
-          <IconButton name="sparkles" label="Premium" hint onPress={openPremium} />
+          <IconButton name="crown" label="Premium" hint onPress={openPremium} />
         </If>
       </If>
       <If when={signedIn() === false}>

@@ -13,7 +13,7 @@ export type IconName =
   | "volumeMute" | "chevronLeft" | "chevronRight" | "chevronDown" | "music" | "user"
   | "logIn" | "logOut" | "disc" | "clock" | "alert" | "close"
   | "sparkles" | "externalLink" | "info" | "github" | "code" | "check"
-  | "sidebarCollapse" | "sidebarExpand" | "power";
+  | "sidebarCollapse" | "sidebarExpand" | "power" | "crown";
 
 // Tabler Icons 3.19.0 (MIT, tabler.io/icons): Outline at a 1.5pt stroke,
 // and Filled for the transport and the liked heart. Each is the inside of a
@@ -54,6 +54,7 @@ const BODY: Record<IconName, string> = {
   sidebarCollapse: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /> <path d="M9 4v16" /> <path d="M15 10l-2 2l2 2" /></g>`,
   sidebarExpand: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /> <path d="M9 4v16" /> <path d="M14 10l2 2l-2 2" /></g>`,
   power: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6a7.75 7.75 0 1 0 10 0" /> <path d="M12 4l0 8" /></g>`,
+  crown: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l4 6l5 -4l-2 10h-14l-2 -10l5 4z" /></g>`,
 };
 
 /** The speaker alone: the first frame of the volume icons' morph. */
@@ -307,6 +308,7 @@ const MOVES: Partial<Record<IconName, [Pose, number]>> = {
   externalLink: [nudge(1.5, -1.5), 300],
   user: [lift, 300],
   sparkles: [swing, 480],
+  crown: [lift, 300],
   info: [lift, 300],
   github: [swing, 480],
   code: [scribble, 560],
