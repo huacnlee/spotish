@@ -282,6 +282,12 @@ impl Spotify {
         query(this, "me", json!([])).await
     }
 
+    /// The extracted color of a cover image, as `{ hex }` (for the ambient
+    /// shader to tint from the artwork).
+    pub async fn colors(this: Instance<Self>, image_url: String) -> Result<Value, String> {
+        query(this, "colors", json!([image_url])).await
+    }
+
     // --- Controls --------------------------------------------------------
 
     /// Plays or pauses.

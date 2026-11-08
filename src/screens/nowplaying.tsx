@@ -5,7 +5,8 @@
 import { Animated, createAnimatedValue, effect, Text, View } from "nsh";
 import { store } from "../ui/store";
 import { clock } from "../ui/types";
-import { Ambient, colorsFor } from "../ui/shader";
+import { resource } from "nsh";
+import { Ambient, coverColors } from "../ui/shader";
 import { BarSlider, Cover, IconButton, PlayButton } from "../ui/controls";
 
 export function NowPlaying() {
@@ -30,12 +31,16 @@ export function NowPlaying() {
     }
   });
 
+  const tint = resource(
+    () => store.player().artwork,
+    async (url) => (url ? ((await store.spotify.colors(url)) as { hex: string }).hex : ""),
+  );
   const position = () => store.seeking() ?? store.player().positionMs;
   const duration = () => Math.max(1, store.player().durationMs);
   const hasTrack = () => store.player().title !== "";
 
   return (
-    <Ambient colors={() => colorsFor(store.player().trackUri)}>
+    <Ambient colors={() => coverColors(tint() ?? "", store.player().trackUri)}>
       {/* The close chevron, over the aurora. */}
       <View class="absolute top-4 left-4 z-10">
         <IconButton

@@ -3,14 +3,19 @@
 import { resource, Scroll, Text, View } from "nsh";
 import { store } from "../ui/store";
 import { CardRow, PageMessage } from "./common";
-import { Ambient, colorsFor } from "../ui/shader";
+import { Ambient, coverColors } from "../ui/shader";
 import { enter } from "../ui/motion";
 import { isTerminal } from "../ui/controls";
 import type { Home as HomeData } from "../ui/types";
 
 export function Home() {
   const home = resource(store.epoch, () => store.spotify.home() as Promise<HomeData>);
-  const colors = () => colorsFor(store.player().trackUri);
+  // The ambient tint comes from the playing cover's own extracted color.
+  const tint = resource(
+    () => store.player().artwork,
+    async (url) => (url ? ((await store.spotify.colors(url)) as { hex: string }).hex : ""),
+  );
+  const colors = () => coverColors(tint() ?? "", store.player().trackUri);
   return (
     <Scroll class="flex-1">
       {/* A living, track-tinted aurora behind the greeting — NSH drawing a

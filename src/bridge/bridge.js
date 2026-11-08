@@ -305,12 +305,32 @@
     async likedSongs(offset = 0) {
       const data = await query("fetchLibraryTracks", { offset, limit: 100 });
       const t = data?.me?.library?.tracks || {};
-      const tracks = (t.items || []).map((i) => track(unwrap(i.track), i.track?._uri)).filter(Boolean);
+      const tracks = (t.items || [])
+        .map((i) => {
+          // A library track's own URI is on the wrapper (`_uri`), not in its data.
+          const d = unwrap(i.track);
+          if (d && !d.uri) d.uri = i.track && i.track._uri;
+          return track(d, i.track && i.track._uri);
+        })
+        .filter(Boolean);
       return {
         header: { uri: "spotify:collection:tracks", kind: "collection", name: "Liked Songs", subtitle: (t.totalCount || tracks.length) + " songs", image: "", description: "" },
         tracks,
         total: t.totalCount || tracks.length,
       };
+    },
+
+    // The extracted color of a cover image (Spotify's own), for the ambient
+    // shader. Prefers the dark tone, which suits a dark background.
+    async colors(imageUrl) {
+      if (!imageUrl) return { hex: "" };
+      try {
+        const data = await query("fetchExtractedColors", { imageUris: [imageUrl] });
+        const c = data && data.extractedColors && data.extractedColors[0];
+        return { hex: (c && ((c.colorDark && c.colorDark.hex) || (c.colorRaw && c.colorRaw.hex))) || "" };
+      } catch (_) {
+        return { hex: "" };
+      }
     },
   };
 

@@ -16,16 +16,24 @@ export function IconButton(props: {
   onPress: () => void;
 }) {
   const size = () => props.size ?? 18;
-  const color = () => (props.on?.() ? "primary" : "muted-foreground");
+  // Icons bake their color in, so hover can't recolor them; instead the icon is
+  // drawn full-strength and the button dims when idle, brightening on hover —
+  // the Spotify feel, and it works with baked-in icon colors.
+  const color = () => (props.on?.() ? "primary" : "foreground");
+  const tone = () => (props.on?.() ? "opacity-100" : "opacity-65 hover:opacity-100");
   return (
     <Button
       accessibilityLabel={props.label}
       disabled={props.disabled?.() ?? false}
       onPress={props.onPress}
-      class="items-center justify-center rounded-full transition-transform duration-150 hover:opacity-85 active:opacity-60 active:scale-95 disabled:opacity-35 motion-reduce:transition-none focus:outline focus:outline-2 focus:outline-ring"
-      style={{ width: size() + 12, height: size() + 12 }}
+      class={`relative items-center justify-center rounded-full transition duration-150 ease-out hover:scale-110 active:scale-90 disabled:opacity-30 disabled:hover:scale-100 motion-reduce:transition-none motion-reduce:hover:scale-100 focus:outline focus:outline-2 focus:outline-ring ${tone()}`}
+      style={{ width: size() + 14, height: size() + 14 }}
     >
       <Icon name={props.name()} size={size()} color={color()} />
+      {/* A small dot marks an active toggle (shuffle / repeat), as Spotify does. */}
+      <If when={props.on?.() ?? false}>
+        <View class="absolute bottom-0.5 size-1 rounded-full bg-primary" />
+      </If>
     </Button>
   );
 }
