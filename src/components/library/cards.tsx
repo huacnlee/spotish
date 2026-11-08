@@ -25,6 +25,14 @@ export function activate(item: Item): void {
   else playItem(item);
 }
 
+// The play button over a card's cover, in golden proportion: the cover
+// (a 144pt card less its 10pt padding each side, 124pt) is φ³ times the
+// button, and the button φ² times its inset from the cover's corner.
+const PHI = (1 + Math.sqrt(5)) / 2;
+const CARD_COVER = 144 - 2 * 10;
+const PLAY_SIZE = Math.round(CARD_COVER / PHI ** 3); // 29
+const PLAY_INSET = Math.round(PLAY_SIZE / PHI ** 2); // 11
+
 /** One card: picture, name, and what it is. With its row's `wave`, it rises
  * in after the cards before it (`index`) each time the page is entered, and
  * on its own when it is scrolled into view. On hover it shows its play
@@ -71,11 +79,12 @@ export function Card(props: { item: Item; index?: number; wave?: ListWave }) {
         </View>
         <If when={!terminal}>
           <View
-            class={`absolute bottom-2 right-2 transition duration-200 ease-out group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 motion-reduce:transition-none ${
+            style={{ right: PLAY_INSET, bottom: PLAY_INSET }}
+            class={`absolute transition duration-200 ease-out group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 motion-reduce:transition-none ${
               playing() ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-75 opacity-0"
             }`}
           >
-            <PlayButton playing={playing()} size={44} disabled={!ready()} onPress={play} />
+            <PlayButton playing={playing()} size={PLAY_SIZE} disabled={!ready()} onPress={play} />
           </View>
         </If>
       </View>

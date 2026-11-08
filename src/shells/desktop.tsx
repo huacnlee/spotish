@@ -3,16 +3,20 @@
 // translucent pill the pages scroll behind.
 
 import { View } from "nsh";
-import { railSidebar } from "../components/layout";
-import { SIDEBAR_WIDTH, Sidebar } from "../components/library/sidebar";
+import { barSize, railSidebar, sidebarWidth } from "../components/layout";
+import { animateLayoutOn } from "../components/ui/motion";
+import { Sidebar } from "../components/library/sidebar";
 import { PlayerBar } from "../components/player/player-bar";
 import { MainStack } from "./main";
 import { nowPlayingOpen } from "../state/overlays";
 
 export function DesktopShell() {
+  // Crossing a breakpoint, the sidebar and the player bar glide to their
+  // new arrangement.
+  animateLayoutOn(() => `${sidebarWidth()}|${barSize()}`);
   return (
     <View class="flex-1 flex-row gap-2 p-2">
-      <View class="shrink-0" style={{ width: railSidebar() ? 72 : SIDEBAR_WIDTH }}>
+      <View class="shrink-0" style={{ width: sidebarWidth() }}>
         <Sidebar compact={railSidebar()} />
       </View>
       <View class="relative min-w-0 flex-1">

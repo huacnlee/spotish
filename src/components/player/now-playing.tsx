@@ -10,7 +10,7 @@ import { LightMenu } from "./light-menu";
 import { Cover, IconButton } from "../ui/controls";
 import { AppSheet } from "../ui/overlays";
 import { MusicLight } from "../ui/toolbar-fx";
-import { enter } from "../ui/motion";
+import { animateLayoutOn, enter } from "../ui/motion";
 import { LikeButton, NEW_COVER, NowPlayingSummary, SeekBar, TransportControls, VolumeControl } from "./parts";
 
 function NowPlayingContent() {
@@ -39,6 +39,8 @@ function NowPlayingContent() {
     const fitted = Math.min(320, Math.floor(size));
     return fitted < 96 ? 0 : fitted;
   };
+  // Rearranging (above / beside / no cover), it glides there.
+  animateLayoutOn(() => `${side()}|${coverSize() > 0}`);
   const cover = () => (
     <View style={coverIn.style}>
       <Cover src={player().artwork} size={coverSize()} class="rounded-2xl shadow-xl" />

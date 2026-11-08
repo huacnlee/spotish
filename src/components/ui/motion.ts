@@ -8,7 +8,7 @@
 // component from `nsh/base` (a `Button`) reads all its props in one binding,
 // so a prop that ticks (`selected` following the player) would replay it.
 
-import { cleanup, createMotion, effect, platform, signal, untracked, type MotionName, type MotionSpec } from "nsh";
+import { cleanup, createMotion, effect, LayoutAnimation, platform, reduceMotion, signal, untracked, type MotionName, type MotionSpec } from "nsh";
 import { DISTANCE, DURATION, EASING, SMOOTH_OUT } from "./tokens";
 
 /** A style that plays `preset` once when the view mounts; spread it into
@@ -285,4 +285,26 @@ export function listItemEntrance(options: {
     style: item.style,
     cover: { opacity: flip.opacity, transform: [{ perspective: COVER_PERSPECTIVE }, ...flip.transform] },
   };
+}
+
+/** Animates the layout when `step` changes (a breakpoint is crossed: the
+ * sidebar opens or narrows, the player bar or Now Playing rearranges):
+ * what moves or resizes glides there, what comes or goes fades. Not on every
+ * size change (a window being dragged follows the pointer at once), only
+ * when the arrangement does. */
+export function animateLayoutOn(step: () => string): void {
+  let last: string | null = null;
+  effect(() => {
+    const now = step();
+    if (last !== null && now !== last && !reduceMotion()) {
+      const curve = { type: "easeInEaseOut" as const };
+      LayoutAnimation.configureNext({
+        duration: DURATION.base,
+        update: curve,
+        create: { ...curve, property: "opacity" },
+        delete: { ...curve, property: "opacity" },
+      });
+    }
+    last = now;
+  });
 }

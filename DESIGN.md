@@ -37,17 +37,26 @@ the code.
 - The light menu is always the last control on the right, after the volume
   (the bar and Now Playing alike).
 - A desktop app's window keeps the desktop layout at any size; phones, and
-  a browser page narrower than 640pt, get the phone's (tabs, mini player). Narrower than 1100pt the sidebar is a
-  rail; narrower than 900pt the player bar is compact, one row, left and
+  a browser page narrower than 640pt, get the phone's (tabs, mini player).
+  Narrower than 860pt the sidebar is a rail. The player bar follows the pages' width (the window less the
+  sidebar): narrower than 760pt it is compact, one row, left and
   right: the cover, title and Like on the left; the transport and the light
   menu on the right; no position or volume (Now Playing has both). Narrower
-  than 640pt it is stacked: taller, two rows (a 36pt radius): the cover,
+  than 520pt it is stacked: taller, two rows (a 36pt radius): the cover,
   the title and artist centred, and Like; under them the transport centred
   and the light menu at the end; under 560pt shuffle and repeat go too. The
   header's Premium becomes an icon under 640pt.
-- The desktop sidebar is 274pt: the account menu's 256 plus the account
-  panel's padding and border, so the menu opens flush with the account row,
-  edge to edge.
+- Crossing one of these breakpoints animates (`animateLayoutOn`): the
+  sidebar and the bar glide to their new size and place, what comes or
+  goes fades (240ms, ease in-out). Resizing between breakpoints follows the
+  window at once; reduced motion jumps.
+- A card's play button is in golden proportion: the 124pt cover is φ³ times
+  the button (29pt), the button φ² times its inset (11pt). Play buttons
+  have no border, only a soft shadow.
+- The desktop sidebar is 274pt wide, 228pt in a middle window (860 to
+  1100pt), a 72pt rail below that. The account menu is exactly as wide as
+  the account row (the sidebar less its panel's padding and border), so it
+  opens flush with it, edge to edge.
 - The account menu's rows have an icon, centred in a slot as wide as the
   avatar above (32pt), so icons line up under the avatar's centre and
   labels under the name; a page that opens in the browser ends in ↗.
@@ -70,10 +79,22 @@ the code.
   running into a smooth ring), Aurora (rays under a crisp hem), Mountains
   (many fine ridgelines in perspective), Mesh (the same terrain as a net of
   rows and columns), Particles (a wave of dots in perspective) Strings
-  (vibrating strings) and Rhythm (a rhythm game's note highway: seven
-  lanes, notes falling to a judgement line that pulses on the beat, key
-  beams as loud as each lane's part of the spectrum). Lines are crisp: a thin bright core in a soft glow,
-  never only a blur. Their flow comes from a clock read with the music's
+  (vibrating strings) and Rhythm (a rhythm game's note highway as wide as the surface,
+  lanes at a piano key's pitch: white notes, short and held, each a stack
+  of short segments, fall to the bottom. The rhythm shoots them: on each
+  beat a handful of the loud lanes fire a short shot at their lowest note
+  once it is close, all the light kept low (a muzzle flash, a short bolt, a
+  flash at the note's lower edge, sparks flying on the shot's way: up
+  and out past the note's sides, never back down; all the light (the
+  shot, its flashes, the sparks) is in the lane's colour, the notes stay
+  white); the note is knocked back up a little
+  and settles; it keeps its white and only brightens a little, segment
+  by segment up from the hit, never all at once. A
+  different handful each beat, never all of them; crisp, never blurred;
+  each shot plays out over about half a second (the
+  lights get the time since the last beat for this, `since`, and that
+  beat's own seed, `onset`); its light is the cover's hue kept vivid). Lines are crisp: a thin bright core in a soft glow, never
+  only a blur. Their flow comes from a clock read with the music's
   levels, never `nsh.time`.
 - Each effect has its own height in Now Playing (the terrains and the
   aurora fill the room, the lines take about half), and never reaches past
@@ -230,8 +251,9 @@ the code.
   pasted on: skip leaves an echo the way it goes, shuffle's lines cross,
   repeat's arrows turn once, the volume's waves come in one by one, the heart
   beats. Small and once per entry.
-- The logo is a pair of beamed sixteenth notes on a green rounded square
-  with two faint record grooves round the middle, centred by eye. In the
+- The logo is a pair of beamed sixteenth notes on a green squircle (a
+  superellipse, exponent 5: corners that ease in continuously, not a
+  rounded square), centred by eye, nothing else behind the notes. In the
   app the green is the theme's `primary` (the links' green), from a light to
   a deep shade of it; the favicon uses the same mark in #5da602. Beside a
   title and its subtitle it is as tall as both lines (44pt).

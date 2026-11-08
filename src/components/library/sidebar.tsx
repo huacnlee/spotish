@@ -19,7 +19,7 @@ import { createListWave, listItemEntrance, type ListWave, WAVE } from "../ui/mot
 import { DURATION, EASING } from "../ui/tokens";
 import { menuPopupHidden, menuPopupLeaving, menuPopupStyle } from "../ui/menu";
 import { fallbackIcon } from "./cards";
-import { layout } from "../layout";
+import { accountMenuWidth, layout } from "../layout";
 
 /** Switches to a page from the sidebar, cross-fading rather than
  * sliding (and closes the phone's drawer). */
@@ -329,13 +329,6 @@ function MenuEntries(props: { name: string; image: string }) {
   );
 }
 
-/** The user menu's width (`w-64`), pt. */
-const MENU_WIDTH = 256;
-
-/** The desktop sidebar's width, pt: the user menu's plus the account
- * panel's padding and border on each side (8 + 1), so the menu, opening
- * above the account row, lines up with it edge to edge. */
-export const SIDEBAR_WIDTH = MENU_WIDTH + 2 * (8 + 1);
 
 /** The account at the sidebar's foot, which opens the user menu: the
  * user's picture and name (Spotish, signed out). */
@@ -350,8 +343,9 @@ function Account(props: { compact: boolean }) {
       placement="top"
       align="start"
       offset={4}
-      popupClass={`w-64 ${popupSurface}`}
-      popupStyle={menuPopupStyle("top", "start")}
+      popupClass={popupSurface}
+      // As wide as the account row, so it opens flush with it.
+      popupStyle={{ ...menuPopupStyle("top", "start"), width: accountMenuWidth() }}
       popupStartingStyle={menuPopupHidden("top", "start")}
       popupEndingStyle={menuPopupLeaving("top", "start")}
       trigger={
