@@ -39,7 +39,15 @@ const playInset = (card: number) => Math.round(playSize(card) / PHI ** 2);
  * in after the cards before it (`index`) each time the page is entered, and
  * on its own when it is scrolled into view. On hover it shows its play
  * button. */
-export function Card(props: { item: Item; index?: number; wave?: ListWave; width?: number }) {
+export function Card(props: {
+  item: Item;
+  index?: number;
+  wave?: ListWave;
+  /** About how wide it is drawn, pt: what its play button is sized by. */
+  width?: number;
+  /** Stretched by its container (a grid's cell) rather than `width` wide. */
+  fill?: boolean;
+}) {
   const width = () => props.width ?? CARD_WIDTH;
   const playing = () => isPlayingContext(props.item.uri);
   const play = () => (opens(props.item) ? toggleCollection(props.item.uri) : playItem(props.item));
@@ -59,7 +67,7 @@ export function Card(props: { item: Item; index?: number; wave?: ListWave; width
     <Button
       accessibilityLabel={`${props.item.name}, ${props.item.subtitle}`}
       onPress={() => activate(props.item)}
-      style={terminal ? rise : { ...rise, width: width() }}
+      style={terminal || props.fill ? rise : { ...rise, width: width() }}
       class={
         terminal
           ? "px-1 focus:bg-muted"
@@ -153,18 +161,26 @@ export function CardRow(props: { title: string; items: Item[]; class?: string; w
  * `wave` they come in as a wave of their own, like a row's. */
 export function CardGrid(props: { items: Item[]; wave?: ListWave; delay?: number }) {
   const wave = untracked(() => props.wave?.child(props.delay ?? 0));
-  // As many columns as fit at about a card's width, and the cards widened
-  // to share the row out, so no room is left empty at its end.
+  // As many columns as fit at a card's width, widened to share the row out
+  // so no room is left at its end. The grid lays the columns out: cards
+  // given widths that add up to the row wrap the last one early once
+  // layout rounds them to the screen's pixels. The width a card gets is
+  // still worked out here, for its play button.
   const room = signal(0);
   const cardWidth = () => {
     const w = room();
-    if (w <= 0) return CARD_WIDTH;
-    return Math.floor((w / Math.max(1, Math.floor(w / CARD_WIDTH))) * 100) / 100;
+    return w > 0 ? w / Math.max(1, Math.floor(w / CARD_WIDTH)) : CARD_WIDTH;
   };
   return (
-    <View class={terminal ? "" : "flex-row flex-wrap"} onLayout={(e) => room.set(e.bounds.size.width)}>
+    <View
+      class={terminal ? "" : "grid"}
+      style={terminal ? undefined : { gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_WIDTH}px, 1fr))` }}
+      onLayout={(e) => room.set(e.bounds.size.width)}
+    >
       <Each of={props.items} key={(i) => i.uri}>
-        {(item, index) => <Card item={item()} index={index()} wave={wave} width={terminal ? undefined : cardWidth()} />}
+        {(item, index) => (
+          <Card item={item()} index={index()} wave={wave} width={terminal ? undefined : cardWidth()} fill={!terminal} />
+        )}
       </Each>
     </View>
   );
