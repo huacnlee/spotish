@@ -83,7 +83,7 @@ export function AppSheet(props: {
           keeps it clear of the window controls and drags the window. A
           full one (Now Playing) places its own top row under them. */}
       <If when={props.side === "left" && !props.full}>
-        <TitleBar />
+        <TitleBar brand={false} />
       </If>
       {/* The content rises in behind the sliding panel. */}
       <If when={!terminal} else={props.children}>

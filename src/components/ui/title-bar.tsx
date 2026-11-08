@@ -1,14 +1,15 @@
 // The window's title bar, drawn by the app. nsh.json hides the system's on
-// every desktop (`window.titleBar.style: "hidden"`), so the content fills the
-// window to its top edge. No band runs across the window: only the column
-// the system's window controls sit over (macOS's traffic lights at the left,
-// Windows' caption buttons at the right, GTK's where the desktop puts them)
-// starts below them, and that gap drags the window (double-click maximizes).
-// In full screen the platform reports no title bar, and the gap goes.
-// Nothing on the web, phones and terminals.
+// every desktop (`window.titleBar: { style: "hidden", height: 40 }`): one
+// bar runs across the top of the window, clear of the system's window
+// controls (macOS's traffic lights at the left, centred in its 40 points;
+// Windows' caption buttons at the right; GTK's where the desktop puts them),
+// and shows the app's mark and name. The whole bar drags the window
+// (double-click maximizes). In full screen the platform reports no title
+// bar, and the bar goes. Nothing on the web, phones and terminals.
 
-import { View } from "nsh";
+import { Text, View } from "nsh";
 import { isAvailable as hasWindow, titleBar } from "nsh/desktop";
+import { Logo } from "../../ui/logo";
 import { terminal } from "./controls";
 
 /** Whether this window's title bar is the app's to draw. */
@@ -24,24 +25,27 @@ export function titleBarArea(): { height: number; left: number; right: number } 
   return titleBar();
 }
 
-/** Whether the window controls sit at `side` of the window. */
-function controlsAt(side: "left" | "right" | "any") {
-  if (!drawsTitleBar) return false;
-  const bar = titleBar();
-  if (bar.height <= 0) return false;
-  if (side === "any") return true;
-  return side === "left" ? bar.left > 0 : bar.right > 0;
-}
-
-/** The draggable gap that keeps a column clear of the window controls, as
- * tall as the title bar the system would have had. Put it first in a column
- * that reaches the window's top edge at `side` (the desktop's sidebar at the
- * left, its pages at the right); `"any"` for one as wide as the window (the
- * phone shell, the left sheet). */
-export function TitleBar(props: { side?: "left" | "right" | "any" }) {
+/** The title bar, as wide as the view it heads (the window, or the left
+ * sheet that covers its top): the mark and the name after the window
+ * controls, or, with `brand={false}`, only the draggable room for them. */
+export function TitleBar(props: { brand?: boolean }) {
   return (
-    <If when={controlsAt(props.side ?? "any")}>
-      <View testID="title-bar" desktop={{ windowDrag: true }} class="shrink-0" style={{ height: titleBar().height }} />
+    <If when={titleBarArea().height > 0}>
+      <View
+        testID="title-bar"
+        desktop={{ windowDrag: true }}
+        class="shrink-0 flex-row items-center gap-2"
+        style={{
+          height: titleBarArea().height,
+          paddingLeft: titleBarArea().left + (titleBarArea().left > 0 ? 4 : 14),
+          paddingRight: titleBarArea().right + 14,
+        }}
+      >
+        <If when={props.brand !== false}>
+          <Logo size={18} />
+          <Text class="text-sm font-semibold text-foreground">Spotish</Text>
+        </If>
+      </View>
     </If>
   );
 }
