@@ -3,7 +3,7 @@
 // with a tooltip); the phone's drawer shows it in full.
 
 import { hasAppWindow, quitApp } from "../../platform/desktop";
-import { type AnimatedValue, createAnimatedValue, createMotion, effect, List, reduceMotion, signal, Text, untracked, View } from "nsh";
+import { type AnimatedValue, createAnimatedValue, createMotion, effect, fpsEnabled, List, reduceMotion, setFpsEnabled, signal, Text, untracked, View } from "nsh";
 import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import type { Item } from "../../backend/types";
 import { libraryQuery, meQuery } from "../../data/queries";
@@ -276,11 +276,12 @@ function SignedOutPrompt(props: { compact: boolean }) {
 
 /** One row of the user menu: its icon, centred in a slot as wide as the
  * avatar above (so the icons line up under its centre and the labels under
- * the name), the label, and a mark for a page that opens in the browser. */
-function Entry(props: { icon: IconName; label: string; external?: boolean; onSelect: () => void }) {
+ * the name), the label, and a mark for a page that opens in the browser,
+ * or, for a setting (`checked` given), a check while it is on. */
+function Entry(props: { icon: IconName; label: string; external?: boolean; checked?: boolean; onSelect: () => void }) {
   const hover = iconMotion();
   return (
-    <MenuItem onSelect={props.onSelect} class={terminal ? "px-1 focus:bg-muted" : menuItem}>
+    <MenuItem onSelect={props.onSelect} checked={props.checked} class={terminal ? "px-1 focus:bg-muted" : menuItem}>
       <View onMouseEnter={() => hover.play(props.icon)} class="flex-1 flex-row items-center gap-2.5">
         <If when={!terminal}>
           <View class="w-8 items-center" style={hover.style}>
@@ -291,6 +292,9 @@ function Entry(props: { icon: IconName; label: string; external?: boolean; onSel
         <If when={props.external && !terminal}>
           <Icon name="externalLink" size={14} color="muted-foreground" />
         </If>
+        <If when={props.checked && !terminal}>
+          <Icon name="check" size={14} color="popover-foreground" />
+        </If>
       </View>
     </MenuItem>
   );
@@ -299,7 +303,7 @@ function Entry(props: { icon: IconName; label: string; external?: boolean; onSel
 const Separator = () => <MenuSeparator class={terminal ? "hidden" : "-mx-1 my-1 h-px bg-border"} />;
 
 /** The user menu: who is signed in and on which plan, then Premium, Spotish
- * and NSH, and Log out. */
+ * and NSH, the FPS monitor, and Log out. */
 function MenuEntries(props: { name: string; image: string }) {
   const premium = () => player().premium === true;
   return (
@@ -322,6 +326,8 @@ function MenuEntries(props: { name: string; image: string }) {
       <Entry icon="info" label="About…" onSelect={() => setAboutOpen(true)} />
       <Entry icon="github" label="GitHub" external onSelect={() => openExternal(REPO_URL)} />
       <Entry icon="code" label="NSH" external onSelect={() => openExternal(NSH_URL)} />
+      {/* NSH's performance monitor: frame rate, frame and commit costs. */}
+      <Entry icon="activity" label="FPS" checked={fpsEnabled()} onSelect={() => setFpsEnabled(!fpsEnabled())} />
       <If when={signedIn() === true || hasAppWindow}>
         <Separator />
       </If>

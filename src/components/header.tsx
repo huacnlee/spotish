@@ -2,7 +2,7 @@
 // Android show the system's, from the page's `title`): Back and Forward,
 // and the account's action.
 
-import { createMotion, signal, Text, token, untracked, View, windowSize } from "nsh";
+import { createMotion, signal, Text, token, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 import { back, canBack, canForward, currentRoute, forward, open, SEARCH } from "../nav";
 import { DISTANCE, DURATION, EASING } from "./ui/tokens";
@@ -23,11 +23,8 @@ export function AccountAction() {
   return (
     <View class="flex-row items-center gap-2">
       <If when={signedIn() === true && player().premium === false}>
-        {/* A narrow window: the same action as an icon, so the header
-            never runs out of room. */}
-        <If when={layout() === "desktop" && windowSize().width < 640} else={<ActionButton label="Premium" onPress={openPremium} />}>
-          <IconButton name="crown" label="Premium" hint onPress={openPremium} />
-        </If>
+        {/* An icon at every width, beside the header's other icons. */}
+        <IconButton name="crown" label="Premium" hint onPress={openPremium} />
       </If>
       <If when={signedIn() === false}>
         <ActionButton label="Log in" variant="primary" onPress={signIn} />

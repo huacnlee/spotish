@@ -102,4 +102,6 @@ function App() {
   );
 }
 
+import { runBench } from "./src/bench-tmp";
+runBench();
 mount(App);

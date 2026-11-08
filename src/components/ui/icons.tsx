@@ -14,7 +14,7 @@ export type IconName =
   | "volumeMute" | "chevronLeft" | "chevronRight" | "chevronDown" | "music" | "user"
   | "logIn" | "logOut" | "disc" | "clock" | "alert" | "close"
   | "sparkles" | "externalLink" | "info" | "github" | "code" | "check"
-  | "sidebarCollapse" | "sidebarExpand" | "power" | "crown";
+  | "sidebarCollapse" | "sidebarExpand" | "power" | "crown" | "activity";
 
 // Tabler Icons 3.19.0 (MIT, tabler.io/icons): Outline at a 1.5pt stroke,
 // and Filled for the transport and the liked heart. Each is the inside of a
@@ -56,6 +56,7 @@ const BODY: Record<IconName, string> = {
   sidebarExpand: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z" /> <path d="M9 4v16" /> <path d="M14 10l2 2l-2 2" /></g>`,
   power: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 6a7.75 7.75 0 1 0 10 0" /> <path d="M12 4l0 8" /></g>`,
   crown: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l4 6l5 -4l-2 10h-14l-2 -10l5 4z" /></g>`,
+  activity: `<g stroke="@" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8l4 -16l3 8h4" /></g>`,
 };
 
 /** The speaker alone: the first frame of the volume icons' morph. */
@@ -311,6 +312,7 @@ const MOVES: Partial<Record<IconName, [Pose, number]>> = {
   user: [lift, 300],
   sparkles: [swing, 480],
   crown: [lift, 300],
+  activity: [lift, 300],
   info: [lift, 300],
   github: [swing, 480],
   code: [scribble, 560],
