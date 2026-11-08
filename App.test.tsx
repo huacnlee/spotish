@@ -182,3 +182,14 @@ test("on a phone, the library drawer has the whole sidebar", async () => {
   await app.press("role:button[Go back]");
   await app.waitFor("Good evening, Ada");
 });
+
+test("the sidebar folds away and comes back", async () => {
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  expect(app.texts()).toContain("Liked Songs");
+  await app.press("role:button[Collapse sidebar]");
+  await app.waitFor("role:button[Expand sidebar]");
+  expect(app.texts()).not.toContain("Liked Songs");
+  await app.press("role:button[Expand sidebar]");
+  await app.waitFor("Liked Songs");
+});

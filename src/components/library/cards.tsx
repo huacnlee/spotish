@@ -1,7 +1,7 @@
 // Cards: playlists, albums, artists and tracks as tiles, in rows that
 // scroll sideways or in a wrapping grid.
 
-import { List, Text, untracked, View } from "nsh";
+import { List, signal, Text, untracked, View } from "nsh";
 import { Button } from "nsh/base";
 import { type Item, opens } from "../../backend/types";
 import { open } from "../../nav";
@@ -26,18 +26,21 @@ export function activate(item: Item): void {
 }
 
 // The play button over a card's cover, in golden proportion: the cover
-// (a 144pt card less its 10pt padding each side, 124pt) is φ³ times the
-// button, and the button φ² times its inset from the cover's corner.
+// (the card less its 10pt padding each side; 124pt in a 144pt card) is φ³
+// times the button, and the button φ² times its inset from the cover's
+// corner (29 and 11 in a 144pt card).
 const PHI = (1 + Math.sqrt(5)) / 2;
-const CARD_COVER = 144 - 2 * 10;
-const PLAY_SIZE = Math.round(CARD_COVER / PHI ** 3); // 29
-const PLAY_INSET = Math.round(PLAY_SIZE / PHI ** 2); // 11
+/** A card's width where nothing sizes it (a row), pt. */
+export const CARD_WIDTH = 144;
+const playSize = (card: number) => Math.round((card - 2 * 10) / PHI ** 3);
+const playInset = (card: number) => Math.round(playSize(card) / PHI ** 2);
 
 /** One card: picture, name, and what it is. With its row's `wave`, it rises
  * in after the cards before it (`index`) each time the page is entered, and
  * on its own when it is scrolled into view. On hover it shows its play
  * button. */
-export function Card(props: { item: Item; index?: number; wave?: ListWave }) {
+export function Card(props: { item: Item; index?: number; wave?: ListWave; width?: number }) {
+  const width = () => props.width ?? CARD_WIDTH;
   const playing = () => isPlayingContext(props.item.uri);
   const play = () => (opens(props.item) ? toggleCollection(props.item.uri) : playItem(props.item));
   // Made once, here: inside the Button's style it would be made (and
@@ -56,11 +59,11 @@ export function Card(props: { item: Item; index?: number; wave?: ListWave }) {
     <Button
       accessibilityLabel={`${props.item.name}, ${props.item.subtitle}`}
       onPress={() => activate(props.item)}
-      style={rise}
+      style={terminal ? rise : { ...rise, width: width() }}
       class={
         terminal
           ? "px-1 focus:bg-muted"
-          : `group w-36 shrink-0 gap-2 rounded-(--radius-card) p-2.5 transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${focusRing}`
+          : `group shrink-0 gap-2 rounded-(--radius-card) p-2.5 transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${focusRing}`
       }
     >
       <View class="relative">
@@ -79,12 +82,12 @@ export function Card(props: { item: Item; index?: number; wave?: ListWave }) {
         </View>
         <If when={!terminal}>
           <View
-            style={{ right: PLAY_INSET, bottom: PLAY_INSET }}
+            style={{ right: playInset(width()), bottom: playInset(width()) }}
             class={`absolute transition duration-200 ease-out group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 motion-reduce:transition-none ${
               playing() ? "translate-y-0 scale-100 opacity-100" : "translate-y-3 scale-75 opacity-0"
             }`}
           >
-            <PlayButton playing={playing()} size={PLAY_SIZE} disabled={!ready()} onPress={play} />
+            <PlayButton playing={playing()} size={playSize(width())} disabled={!ready()} onPress={play} />
           </View>
         </If>
       </View>
@@ -150,10 +153,18 @@ export function CardRow(props: { title: string; items: Item[]; class?: string; w
  * `wave` they come in as a wave of their own, like a row's. */
 export function CardGrid(props: { items: Item[]; wave?: ListWave; delay?: number }) {
   const wave = untracked(() => props.wave?.child(props.delay ?? 0));
+  // As many columns as fit at about a card's width, and the cards widened
+  // to share the row out, so no room is left empty at its end.
+  const room = signal(0);
+  const cardWidth = () => {
+    const w = room();
+    if (w <= 0) return CARD_WIDTH;
+    return Math.floor((w / Math.max(1, Math.floor(w / CARD_WIDTH))) * 100) / 100;
+  };
   return (
-    <View class={terminal ? "" : "flex-row flex-wrap"}>
+    <View class={terminal ? "" : "flex-row flex-wrap"} onLayout={(e) => room.set(e.bounds.size.width)}>
       <Each of={props.items} key={(i) => i.uri}>
-        {(item, index) => <Card item={item()} index={index()} wave={wave} />}
+        {(item, index) => <Card item={item()} index={index()} wave={wave} width={terminal ? undefined : cardWidth()} />}
       </Each>
     </View>
   );

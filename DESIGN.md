@@ -38,7 +38,13 @@ the code.
   (the bar and Now Playing alike).
 - A desktop app's window keeps the desktop layout at any size; phones, and
   a browser page narrower than 640pt, get the phone's (tabs, mini player).
-  Narrower than 860pt the sidebar is a rail. The player bar follows the pages' width (the window less the
+  Narrower than 860pt the sidebar is a rail. The header's first button
+  folds the sidebar away entirely (the pages take the whole window) and
+  brings it back, at any width (remembered between runs; it animates like
+  a breakpoint).
+- Card grids (an artist's discography, search) fill their row: as many
+  columns as fit at about 144pt, the cards widened to share the row out,
+  the play button keeping its golden proportion to the cover. The player bar follows the pages' width (the window less the
   sidebar): narrower than 760pt it is compact, one row, left and
   right: the cover, title and Like on the left; the transport and the light
   menu on the right; no position or volume (Now Playing has both). Narrower
@@ -162,6 +168,9 @@ the code.
   border), and its radius is the row's plus that inset (16 = 8 + 8).
 - Times (position, duration, a track's length) are monospace, equal-width
   figures (`Digits`, `src/components/ui/digits.tsx`), so they don't jitter.
+  The monospace face is JetBrains Mono where installed, else the system's
+  own (`ui-monospace`, then `monospace`): theme.json's `font-mono` is a
+  fallback list, so no system warns about a missing font.
 
 ## Motion
 

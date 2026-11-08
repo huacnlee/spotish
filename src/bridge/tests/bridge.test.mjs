@@ -472,3 +472,28 @@ test("a cover's palette leads with its most telling colours, without near-duplic
     }
   assert.deepEqual(B.paletteOf([0, 0, 0, 0], 5), []);
 });
+
+// --- Which time is the playing track's ------------------------------------
+
+test("the bar's time reads its clocks, a countdown and its slider as a share", () => {
+  assert.deepEqual(B.barTime("1:00", "3:20", null), { positionMs: 60000, durationMs: 200000 });
+  assert.deepEqual(B.barTime("1:00", "-2:20", null), { positionMs: 60000, durationMs: 200000 });
+  // A slider in seconds is read as a share of its range, not as ms.
+  assert.deepEqual(B.barTime("1:00", "3:20", { value: 100, max: 200 }), { positionMs: 100000, durationMs: 200000 });
+  assert.deepEqual(B.barTime("", "", { value: 5000, max: 200000 }), { positionMs: 5000, durationMs: 200000 });
+  assert.equal(B.barTime("", "", null), null);
+});
+
+test("the time comes from the element that is the bar's track, not another one", () => {
+  const playing = { duration: 200, currentTime: 61, paused: false };
+  const preloading = { duration: 95, currentTime: 2, paused: false }; // the next track, warming up
+  const old = { duration: 180, currentTime: 179, paused: true };
+  const bar = { positionMs: 60000, durationMs: 200000 };
+  // Whatever order the page lists them in.
+  assert.deepEqual(B.timeOf([preloading, old, playing], bar), { positionMs: 61000, durationMs: 200000 });
+  assert.deepEqual(B.timeOf([old, playing, preloading], bar), { positionMs: 61000, durationMs: 200000 });
+  // None is the bar's track: the bar's own numbers.
+  assert.deepEqual(B.timeOf([preloading, old], bar), bar);
+  // No bar: a playing element.
+  assert.deepEqual(B.timeOf([old, playing], null), { positionMs: 61000, durationMs: 200000 });
+});

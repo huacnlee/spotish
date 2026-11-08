@@ -3,7 +3,7 @@
 // translucent pill the pages scroll behind.
 
 import { View } from "nsh";
-import { barSize, railSidebar, sidebarWidth } from "../components/layout";
+import { barSize, railSidebar, sidebarShown, sidebarWidth } from "../components/layout";
 import { animateLayoutOn } from "../components/ui/motion";
 import { Sidebar } from "../components/library/sidebar";
 import { PlayerBar } from "../components/player/player-bar";
@@ -16,9 +16,12 @@ export function DesktopShell() {
   animateLayoutOn(() => `${sidebarWidth()}|${barSize()}`);
   return (
     <View class="flex-1 flex-row gap-2 p-2">
-      <View class="shrink-0" style={{ width: sidebarWidth() }}>
-        <Sidebar compact={railSidebar()} />
-      </View>
+      {/* Folded away by the user, the pages take the whole window. */}
+      <If when={sidebarShown()}>
+        <View class="shrink-0" style={{ width: sidebarWidth() }}>
+          <Sidebar compact={railSidebar()} />
+        </View>
+      </If>
       <View class="relative min-w-0 flex-1">
         <MainStack class="min-w-0 overflow-hidden" />
         {/* Not drawn under Now Playing: its glass reads what is behind it

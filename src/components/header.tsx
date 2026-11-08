@@ -12,6 +12,7 @@ import { openPremium } from "../state/links";
 import { player } from "../state/player";
 import { signedIn, signIn } from "../state/session";
 import { layout } from "./layout";
+import { sidebarCollapsed, toggleSidebar } from "../state/sidebar";
 import { ActionButton, IconButton, terminal } from "./ui/controls";
 
 /** Log in while signed out; Premium for a free account; nothing
@@ -111,6 +112,15 @@ export function PageHeader(props: { title: string; showTitle?: boolean }) {
           : "min-h-14 flex-row items-center gap-2 px-4 pt-[env(safe-area-inset-top)]"
       }
     >
+      {/* Folds the sidebar away entirely, or brings it back. */}
+      <If when={desktop() && !terminal}>
+        <IconButton
+          name={sidebarCollapsed() ? "sidebarExpand" : "sidebarCollapse"}
+          label={sidebarCollapsed() ? "Expand sidebar" : "Collapse sidebar"}
+          hint
+          onPress={toggleSidebar}
+        />
+      </If>
       <If when={canBack() || desktop()}>
         <IconButton name="chevronLeft" label="Go back" short="Back" disabled={!canBack()} onPress={back} />
       </If>

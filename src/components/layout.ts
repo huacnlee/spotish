@@ -4,6 +4,7 @@
 // its player bar keeps only what fits.
 
 import { platform, windowSize } from "nsh";
+import { sidebarCollapsed } from "../state/sidebar";
 
 export type Layout = "desktop" | "phone" | "terminal";
 
@@ -45,15 +46,21 @@ export function layout(): Layout {
 /** How the desktop's player bar is laid out (tracked). */
 export const barSize = (): "full" | "compact" | "stacked" => {
   // The pages' width, which the bar floats over.
-  const w = windowSize().width - sidebarWidth() - SHELL_GAPS;
+  const w = windowSize().width - sidebarWidth() - (sidebarShown() ? SHELL_GAPS : 2 * 8);
   return w < STACKED_BAR ? "stacked" : w < COMPACT_BAR ? "compact" : "full";
 };
 
-/** Whether the desktop's sidebar is a rail of icons (tracked). */
+/** Whether the desktop's sidebar is a rail of icons (tracked): the window
+ * is too narrow for it open. */
 export const railSidebar = () => windowSize().width < RAIL;
 
+/** Whether the desktop's sidebar shows at all (tracked): the user can fold
+ * it away entirely. */
+export const sidebarShown = () => !sidebarCollapsed();
+
 /** The desktop sidebar's width now, pt (tracked). */
-export const sidebarWidth = () => (railSidebar() ? RAIL_WIDTH : windowSize().width < ALBUM_COLUMN ? SIDEBAR_MIDDLE : SIDEBAR_WIDE);
+export const sidebarWidth = () =>
+  !sidebarShown() ? 0 : railSidebar() ? RAIL_WIDTH : windowSize().width < ALBUM_COLUMN ? SIDEBAR_MIDDLE : SIDEBAR_WIDE;
 
 /** The user menu's width, pt (tracked): the account row's, so it opens flush
  * with it; from the rail, the wide sidebar's row. */
