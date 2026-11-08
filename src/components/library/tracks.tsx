@@ -6,7 +6,7 @@ import { Digits } from "../ui/digits";
 import { Text, untracked, View } from "nsh";
 import { Button } from "nsh/base";
 import { clock, type Track } from "../../backend/types";
-import { isCurrentTrack, player } from "../../state/player";
+import { isCurrentTrack, isPlaying } from "../../state/player";
 import { Cover, LAYER, focusRing, terminal } from "../ui/controls";
 import { PlayingBars } from "../ui/playing";
 import { Icon } from "../ui/icons";
@@ -62,7 +62,7 @@ export function TrackRow(props: {
     }),
   );
   const current = () => isCurrentTrack(props.track?.uri ?? "");
-  const playing = () => current() && player().playing;
+  const playing = () => current() && isPlaying();
   const label = () => (props.track ? `${props.track.name}, ${props.track.artists}` : "");
   return (
     <Button

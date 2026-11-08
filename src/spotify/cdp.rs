@@ -138,45 +138,54 @@ impl Cdp {
     }
 
     /// Talks over the browser's DevTools WebSocket (`ws://127.0.0.1:…`).
+    ///
+    /// A thread reads, blocked until a message arrives; another writes each
+    /// message as it is queued, on a clone of the same TCP stream (a client
+    /// socket of its own over it: the reader only reads, the writer only
+    /// writes). Neither wakes while nothing happens, and nothing waits for
+    /// the other.
     pub fn over_websocket(url: &str, events: mpsc::Sender<CdpEvent>) -> Result<Cdp, String> {
-        use tungstenite::{Message, stream::MaybeTlsStream};
+        use tungstenite::{Message, WebSocket, protocol::Role, stream::MaybeTlsStream};
         let (mut socket, _) = tungstenite::connect(url).map_err(|e| format!("connect {url}: {e}"))?;
-        if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
-            stream.set_read_timeout(Some(Duration::from_millis(15))).map_err(|e| e.to_string())?;
-            let _ = stream.set_nodelay(true);
-        }
+        let stream = match socket.get_mut() {
+            MaybeTlsStream::Plain(stream) => {
+                let _ = stream.set_nodelay(true);
+                stream.set_read_timeout(None).map_err(|e| e.to_string())?;
+                stream.try_clone().map_err(|e| e.to_string())?
+            }
+            _ => return Err(format!("{url}: not a plain loopback connection")),
+        };
         let (out, queued) = mpsc::channel::<String>();
         let pending: PendingMap = Arc::default();
         let closed = Arc::new(AtomicBool::new(false));
+        std::thread::Builder::new()
+            .name("spotish-cdp-write".into())
+            .spawn(move || {
+                let shutdown = stream.try_clone();
+                let mut writer = WebSocket::from_raw_socket(stream, Role::Client, None);
+                while let Ok(text) = queued.recv() {
+                    if writer.send(Message::text(text)).is_err() {
+                        break;
+                    }
+                }
+                // Dropped (or the connection broke): the reader, blocked in
+                // its read, ends with the connection.
+                if let Ok(stream) = shutdown {
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
+                }
+            })
+            .map_err(|e| e.to_string())?;
         {
             let pending = pending.clone();
             let closed = closed.clone();
-            // tungstenite's socket is not split across threads: one thread
-            // writes what was queued and reads with a short timeout.
             std::thread::Builder::new()
-                .name("spotish-cdp".into())
+                .name("spotish-cdp-read".into())
                 .spawn(move || {
-                    'io: loop {
-                        loop {
-                            match queued.try_recv() {
-                                Ok(text) => {
-                                    if socket.send(Message::text(text)).is_err() {
-                                        break 'io;
-                                    }
-                                }
-                                Err(mpsc::TryRecvError::Empty) => break,
-                                Err(mpsc::TryRecvError::Disconnected) => break 'io,
-                            }
-                        }
+                    loop {
                         match socket.read() {
                             Ok(Message::Text(text)) => dispatch(&text, &pending, &events),
                             Ok(Message::Close(_)) => break,
                             Ok(_) => {}
-                            Err(tungstenite::Error::Io(e))
-                                if matches!(
-                                    e.kind(),
-                                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
-                                ) => {}
                             Err(e) => {
                                 log::warn!("devtools connection ended: {e}");
                                 break;
@@ -436,6 +445,37 @@ mod tests {
         assert!(heard.iter().any(|e| e.method == CLOSED));
         assert!(cdp.is_closed());
         assert_eq!(cdp.call(None, "X", json!({}), Duration::from_secs(1)), Err(CdpError::Closed));
+    }
+
+    #[test]
+    fn talks_over_a_websocket_without_polling() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        // A fake browser: answers each call with its id, then sends an event.
+        let browser = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut ws = tungstenite::accept(stream).unwrap();
+            for _ in 0..2 {
+                let message = ws.read().unwrap();
+                let call: Value = serde_json::from_str(message.to_text().unwrap()).unwrap();
+                ws.send(tungstenite::Message::text(json!({ "id": call["id"], "result": { "n": call["params"]["n"] } }).to_string()))
+                    .unwrap();
+            }
+            ws.send(tungstenite::Message::text(json!({ "method": "Page.loadEventFired", "params": {} }).to_string()))
+                .unwrap();
+            // Until the client goes.
+            while ws.read().is_ok() {}
+        });
+        let (events, heard) = mpsc::channel();
+        let cdp = Cdp::over_websocket(&format!("ws://127.0.0.1:{port}/devtools/browser/x"), events).unwrap();
+        for n in 0..2 {
+            assert_eq!(cdp.call(None, "Runtime.evaluate", json!({ "n": n }), Duration::from_secs(2)), Ok(json!({ "n": n })));
+        }
+        assert_eq!(heard.recv_timeout(Duration::from_secs(2)).unwrap().method, "Page.loadEventFired");
+        drop(cdp);
+        // The writer goes with the client and shuts the connection: both ends finish.
+        assert_eq!(heard.recv_timeout(Duration::from_secs(2)).unwrap().method, CLOSED);
+        browser.join().unwrap();
     }
 
     #[test]
