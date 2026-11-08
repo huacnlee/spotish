@@ -126,10 +126,10 @@ function Page(props: { uri: string; data: () => CollectionData }) {
   );
   const footer = () => (
     <View class="pb-8">
-      <If when={props.data().releases.length > 0}>
+      <If when={(props.data().releases ?? []).length > 0}>
         <View class="gap-2 px-3 pt-8">
           <SectionTitle class="px-3">Discography</SectionTitle>
-          <CardGrid items={props.data().releases} />
+          <CardGrid items={props.data().releases ?? []} />
         </View>
       </If>
     </View>

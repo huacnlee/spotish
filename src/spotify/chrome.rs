@@ -211,8 +211,11 @@ impl Browser {
             .arg("--disable-extensions")
             .arg("--no-default-browser-check")
             .arg("--disable-features=Translate,MediaRouter")
-            .arg("--autoplay-policy=no-user-gesture-required")
-            .arg("--password-store=basic");
+            .arg("--autoplay-policy=no-user-gesture-required");
+        // No --password-store override: use the system keyring (gnome-libsecret
+        // on most Linux desktops), the same store the user's own browser uses,
+        // so cookies persist across restarts and a login imported from that
+        // browser (SPOTISH_PROFILE) decrypts.
         match mode {
             Mode::Headless => {
                 command
