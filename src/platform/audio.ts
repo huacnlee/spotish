@@ -12,7 +12,7 @@
 // The meter starts with its first user and stops a few seconds after its
 // last one goes, so it costs nothing while no visual shows.
 
-import { cleanup, host, lifecycle, platform, reduceMotion, signal, type Accessor, type Signal } from "nsh";
+import { cleanup, createAnimatedValue, host, lifecycle, platform, reduceMotion, signal, type Accessor, type Signal } from "nsh";
 import { AudioMeter, type AudioFrame } from "spotish/native";
 
 export type { AudioFrame };
@@ -177,5 +177,25 @@ export function audioLevels(): Accessor<AudioFrame> {
     if (!showing()) return ZERO_FRAME;
     if (!s.meter) settle(s);
     return s.frame();
+  };
+}
+
+/** Animated values that follow numbers set from JS: each `set` reaches the
+ * shader as a value of its own (`ShaderLayer` slots), so the shader draws
+ * again without its layer being sent anew. Sending the layer anew counts as
+ * a change of the view's drawing, and the platform then takes what is
+ * behind every glass that view may draw under (a whole-window picture,
+ * rendered and read back) on each of the music's frames. Only changed
+ * numbers are sent. */
+export function liveValues(count: number) {
+  const values = Array.from({ length: count }, () => createAnimatedValue(0));
+  const last = new Array<number>(count).fill(0);
+  return {
+    values,
+    set(i: number, v: number) {
+      if (last[i] === v) return;
+      last[i] = v;
+      values[i].set(v);
+    },
   };
 }

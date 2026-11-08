@@ -2,7 +2,7 @@
 // narrow desktop window it is a `compact` rail of icons and covers (each
 // with a tooltip); the phone's drawer shows it in full.
 
-import { List, signal, Text, View } from "nsh";
+import { type AnimatedValue, createAnimatedValue, createMotion, effect, List, reduceMotion, signal, Text, untracked, View } from "nsh";
 import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import type { Item } from "../../backend/types";
 import { libraryQuery, meQuery } from "../../data/queries";
@@ -12,16 +12,80 @@ import { setAboutOpen, setDrawerOpen } from "../../state/overlays";
 import { isCurrentContext, isPlayingContext, player } from "../../state/player";
 import { signedIn, signIn, signOut } from "../../state/session";
 import { ActionButton, Cover, focusRing, Hint, IconButton, LAYER, menuItem, popupSurface, terminal } from "../ui/controls";
-import { ErrorState, RowsSkeleton } from "../ui/feedback";
+import { ErrorState, LibrarySkeleton, Reveal } from "../ui/feedback";
 import { Icon, iconMotion, type IconName } from "../ui/icons";
 import { PlayingBars } from "../ui/playing";
+import { createListWave, listItemEntrance, type ListWave, WAVE } from "../ui/motion";
+import { DURATION, EASING } from "../ui/tokens";
+import { menuPopupHidden, menuPopupLeaving, menuPopupStyle } from "../ui/menu";
 import { fallbackIcon } from "./cards";
+import { layout } from "../layout";
 
 /** Switches to a page from the sidebar, cross-fading rather than
  * sliding (and closes the phone's drawer). */
 function go(route: Route) {
   switchTo(route);
   setDrawerOpen(false);
+}
+
+/** A sidebar row's height and the gap under it (h-11, and gap-1 or pb-1):
+ * rows are 48pt apart in both panels. */
+const ROW_STEP = 44 + 4;
+
+/** A panel's selection (transitions.dev "Tabs sliding"): one background
+ * behind the rows that slides to the selected one (`index`, -1: none), rather
+ * than each row lighting its own. With no selection it fades away; from no
+ * selection it fades in where it lands. `top`: the first row's top in the
+ * panel; `scroll`: the offset of the list it sits behind, which it follows
+ * natively, without easing (a row scrolled away goes out of the panel, which
+ * clips it). */
+function SlidingSelection(props: { index: () => number; top: number; scroll?: AnimatedValue }) {
+  const motion = createMotion({ initial: { opacity: 0 } });
+  // Where it was last sent: undefined before the first placement, -1 while
+  // hidden.
+  let at: number | undefined;
+  effect(() => {
+    const i = props.index();
+    untracked(() => {
+      const from = at;
+      at = i;
+      if (from === i) return;
+      const y = props.top + i * ROW_STEP;
+      // The first placement, and reduced motion, jump; later ones slide.
+      if (from === undefined || reduceMotion()) {
+        if (i >= 0) motion.translateY.set(y);
+        motion.opacity.set(i >= 0 ? 1 : 0);
+        return;
+      }
+      const timing = { duration: DURATION.base, easing: EASING.inOut };
+      if (i < 0) {
+        void motion.opacity.timing(0, timing);
+        return;
+      }
+      if (from < 0) motion.translateY.set(y);
+      else void motion.translateY.timing(y, timing);
+      void motion.opacity.timing(1, timing);
+    });
+  });
+  const y = props.scroll ? motion.translateY.sub(props.scroll) : motion.translateY;
+  return (
+    <View
+      class="pointer-events-none absolute left-2 right-2 top-0 h-11 rounded-(--radius-inset) bg-secondary"
+      style={{ opacity: motion.opacity, transform: [{ translateY: y }] }}
+    />
+  );
+}
+
+/** The nav panel's selection: Home (and Search, where the panel lists it). */
+function NavIndicator() {
+  const index = () => {
+    const name = currentRoute().name;
+    if (name === "home") return 0;
+    // The desktop lists Search in the header, not here.
+    if (name === "search" && layout() !== "desktop") return 1;
+    return -1;
+  };
+  return <SlidingSelection index={index} top={8} />;
 }
 
 /** One of the main pages. */
@@ -38,7 +102,7 @@ function NavItem(props: { icon: IconName; label: string; route: Route; compact: 
       class={
         terminal
           ? "px-1 focus:bg-muted selected:bg-muted"
-          : `group h-11 flex-row items-center gap-3 rounded-(--radius-inset) transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] selected:bg-secondary motion-reduce:transition-none ${focusRing} ${
+          : `group h-11 flex-row items-center gap-3 rounded-(--radius-inset) transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] motion-reduce:transition-none ${focusRing} ${
               props.compact ? "justify-center" : "px-2"
             }`
       }
@@ -62,7 +126,20 @@ function NavItem(props: { icon: IconName; label: string; route: Route; compact: 
 
 /** One library entry: a cell of the recycling list, so it reads `item()`
  * where it is used. */
-function LibraryRow(props: { item: Item | undefined; compact: boolean }) {
+function LibraryRow(props: { item: Item | undefined; compact: boolean; index: number; wave?: ListWave }) {
+  // The rows wave in when the library shows; a row scrolled to comes in on
+  // its own (its cover flipping open just after). Made once, here: the
+  // Button re-reads its style with its other props, and a motion made there
+  // would play again.
+  const { style: entrance, cover: coverIn } = untracked(() =>
+    listItemEntrance({
+      wave: props.wave,
+      key: () => props.item?.uri ?? "",
+      index: () => props.index,
+      axis: "translateX",
+      turns: WAVE.rows,
+    }),
+  );
   const uri = () => props.item?.uri ?? "";
   const kind = () => props.item?.kind ?? "";
   const selected = () => {
@@ -77,22 +154,25 @@ function LibraryRow(props: { item: Item | undefined; compact: boolean }) {
       selected={selected()}
       onPress={() => uri() && go({ name: "collection", uri: uri() })}
       tooltip={props.compact ? <Hint label={props.item?.name ?? ""} /> : undefined}
+      style={entrance}
       class={
         terminal
           ? "flex-row gap-1 px-1 focus:bg-muted selected:bg-muted"
-          : `group h-11 flex-row items-center gap-3 rounded-(--radius-inset) px-2 transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] active:bg-muted selected:bg-secondary motion-reduce:transition-none ${focusRing} ${
+          : `group h-11 flex-row items-center gap-3 rounded-(--radius-inset) px-2 transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] active:bg-muted motion-reduce:transition-none ${focusRing} ${
               props.compact ? "justify-center" : ""
             }`
       }
     >
-      <Cover
-        src={props.item?.image ?? ""}
-        size={props.compact ? 36 : 30}
-        round
-        liked={kind() === "collection"}
-        fallback={fallbackIcon(kind())}
-        class={`${LAYER} group-hover:scale-110 group-active:scale-95`}
-      />
+      <View style={coverIn}>
+        <Cover
+          src={props.item?.image ?? ""}
+          size={props.compact ? 36 : 30}
+          round
+          liked={kind() === "collection"}
+          fallback={fallbackIcon(kind())}
+          class={`${LAYER} group-hover:scale-110 group-active:scale-95`}
+        />
+      </View>
       <If when={!props.compact || terminal}>
         <Text class={`line-clamp-1 min-w-0 flex-1 text-sm font-medium ${current() ? "text-primary" : "text-foreground"}`}>
           {props.item?.name ?? ""}
@@ -109,26 +189,52 @@ function LibraryRow(props: { item: Item | undefined; compact: boolean }) {
  * skeleton rows while it is not known yet. */
 function LibraryPanel(props: { compact: boolean }) {
   const library = libraryQuery();
+  // The list's scroll offset, for the selection behind its rows.
+  const scroll = createAnimatedValue(0);
+  // Which row is selected: the open collection's place in the library.
+  const selectedIndex = () => {
+    const route = currentRoute();
+    if (route.name !== "collection") return -1;
+    return library.data()?.items.findIndex((i) => i.uri === route.uri) ?? -1;
+  };
   return (
     <View accessibilityLabel="Your Library" class={terminal ? "min-h-0 flex-1" : "relative min-h-0 flex-1 overflow-hidden rounded-(--radius-panel) border border-border bg-card"}>
+      <If when={!terminal && signedIn() !== false}>
+        {/* Behind the rows (the list's own top padding is 8pt). */}
+        <SlidingSelection index={selectedIndex} top={8} scroll={scroll} />
+      </If>
       <If when={signedIn() !== false} else={<SignedOutPrompt compact={props.compact} />}>
-        <If when={library.data()} else={<LibraryPlaceholder query={library} compact={props.compact} />}>
-          {(lib) => (
-            <List
-              each={lib().items}
-              keyExtractor={(i) => i.uri}
-              estimatedItemSize={48}
-              contentClass="px-2 pt-2 pb-1"
-              class="flex-1"
-            >
-              {(item) => (
-                <View class="pb-1">
-                  <LibraryRow item={item()} compact={props.compact} />
-                </View>
-              )}
-            </List>
-          )}
-        </If>
+        <Reveal
+          data={library.data()}
+          placeholder={<LibraryPlaceholder query={library} compact={props.compact} />}
+          class="min-h-0 flex-1"
+        >
+          {(lib, instant) => {
+            // The rows wave in when they first show (at once when cached,
+            // as the skeleton fades when they loaded); rows scrolled to come
+            // in on their own.
+            const wave = createListWave({ isTop: () => true, afterReveal: !instant });
+            return (
+              <List
+                each={lib().items}
+                keyExtractor={(i) => i.uri}
+                estimatedItemSize={48}
+                // Stops with a whole row at the top (rows are 48pt apart).
+                snapToInterval={48}
+                snapToAlignment="start"
+                scrollValue={scroll}
+                contentClass="px-2 pt-2 pb-1"
+                class="flex-1"
+              >
+                {(item, index) => (
+                  <View class="pb-1">
+                    <LibraryRow item={item()} compact={props.compact} index={index()} wave={wave} />
+                  </View>
+                )}
+              </List>
+            );
+          }}
+        </Reveal>
       </If>
       {/* Rows leave the panel softly at its bottom edge, not cut off. */}
       <If when={!terminal}>
@@ -140,7 +246,7 @@ function LibraryPanel(props: { compact: boolean }) {
 
 function LibraryPlaceholder(props: { query: ReturnType<typeof libraryQuery>; compact: boolean }) {
   return (
-    <If when={props.query.error() && !props.compact} else={<RowsSkeleton rows={props.compact ? 4 : 6} />}>
+    <If when={props.query.error() && !props.compact} else={<LibrarySkeleton compact={props.compact} rows={props.compact ? 4 : 6} />}>
       <ErrorState message="Your library didn't load." onRetry={props.query.refetch} />
     </If>
   );
@@ -167,23 +273,12 @@ function SignedOutPrompt(props: { compact: boolean }) {
   );
 }
 
-/** One row of the user menu: an icon slot, the label, and a mark for a
- * page that opens in the browser. */
-function Entry(props: { icon: IconName; label: string; external?: boolean; onSelect: () => void }) {
-  const hover = iconMotion();
+/** One row of the user menu: its label only. No icons or marks: the words
+ * start on the avatar's left edge above (the same 10pt inset). */
+function Entry(props: { label: string; onSelect: () => void }) {
   return (
     <MenuItem onSelect={props.onSelect} class={terminal ? "px-1 focus:bg-muted" : menuItem}>
-      <View onMouseEnter={() => hover.play(props.icon)} class="flex-1 flex-row items-center gap-2.5">
-        <If when={!terminal}>
-          <View style={hover.style}>
-            <Icon name={props.icon} size={16} color="muted-foreground" />
-          </View>
-        </If>
-        <Text class="flex-1 text-sm text-popover-foreground">{props.label}</Text>
-        <If when={props.external && !terminal}>
-          <Icon name="externalLink" size={12} color="muted-foreground" />
-        </If>
-      </View>
+      <Text class="flex-1 text-sm text-popover-foreground">{props.label}</Text>
     </MenuItem>
   );
 }
@@ -207,16 +302,16 @@ function MenuEntries(props: { name: string; image: string }) {
         <Separator />
       </If>
       <If when={!premium()}>
-        <Entry icon="sparkles" label="Premium" external onSelect={openPremium} />
+        <Entry label="Premium" onSelect={openPremium} />
       </If>
-      <Entry icon="music" label="Spotify" external onSelect={() => openExternal(SPOTIFY_URL)} />
+      <Entry label="Spotify" onSelect={() => openExternal(SPOTIFY_URL)} />
       <Separator />
-      <Entry icon="info" label="About…" onSelect={() => setAboutOpen(true)} />
-      <Entry icon="github" label="GitHub" external onSelect={() => openExternal(REPO_URL)} />
-      <Entry icon="code" label="NSH" external onSelect={() => openExternal(NSH_URL)} />
+      <Entry label="About…" onSelect={() => setAboutOpen(true)} />
+      <Entry label="GitHub" onSelect={() => openExternal(REPO_URL)} />
+      <Entry label="NSH" onSelect={() => openExternal(NSH_URL)} />
       <If when={signedIn() === true}>
         <Separator />
-        <Entry icon="logOut" label="Log out" onSelect={() => void signOut()} />
+        <Entry label="Log out" onSelect={() => void signOut()} />
       </If>
     </>
   );
@@ -235,9 +330,10 @@ function Account(props: { compact: boolean }) {
       placement="top"
       align="start"
       offset={4}
-      popupClass={`w-64 ${popupSurface} transition duration-150 ease-out motion-reduce:transition-none`}
-      popupStartingClass="opacity-0 translate-y-1"
-      popupEndingClass="opacity-0"
+      popupClass={`w-64 ${popupSurface}`}
+      popupStyle={menuPopupStyle("top", "start")}
+      popupStartingStyle={menuPopupHidden("top", "start")}
+      popupEndingStyle={menuPopupLeaving("top", "start")}
       trigger={
         <Button
           accessibilityLabel={`User menu: ${name()}`}
@@ -283,9 +379,16 @@ export function Sidebar(props: { compact?: boolean }) {
       role="navigation"
       class={terminal ? "min-h-0 flex-1 gap-1" : "min-h-0 flex-1 gap-2"}
     >
-      <View class={terminal ? "" : `gap-1 rounded-(--radius-panel) border border-border bg-card p-2`}>
+      <View class={terminal ? "" : `relative gap-1 rounded-(--radius-panel) border border-border bg-card p-2`}>
+        <If when={!terminal}>
+          <NavIndicator />
+        </If>
         <NavItem icon="home" label="Home" route={{ name: "home" }} compact={compact()} />
-        <NavItem icon="search" label="Search" route={{ name: "search" }} compact={compact()} />
+        {/* The desktop searches from the header's top-right corner; the
+            phone's drawer and the terminal keep Search here. */}
+        <If when={layout() !== "desktop" || terminal}>
+          <NavItem icon="search" label="Search" route={{ name: "search" }} compact={compact()} />
+        </If>
       </View>
       <LibraryPanel compact={compact()} />
       {/* The account: a panel of its own, its row like every other. */}

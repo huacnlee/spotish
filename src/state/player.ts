@@ -1,30 +1,105 @@
 // Playback: the player's state as the UI shows it, and the intents that
 // change it. The backend owns playback; this mirrors it, moves the position
 // on locally between its messages, and shows a control's result at once
-// (an optimistic value) until the backend's next message replaces it. A
-// control that fails drops its own optimistic value, so nothing stays on
-// screen that did not happen.
+// (an optimistic change), the request going out at the same time. A change
+// stays on screen until the backend reports it (or, once the request is
+// done, a moment later the backend's word wins); unrelated messages (the
+// heartbeat) don't wipe it, so nothing flickers back. A control that fails
+// drops its change, so nothing stays on screen that did not happen.
 
 import { cleanup, computed, effect, signal, untracked } from "nsh";
-import { EMPTY_PLAYER, type Item, type PlayerState, positionAt, type RepeatMode } from "../backend/types";
+import { EMPTY_PLAYER, type Item, type PlayerState, positionAt, type RepeatMode, type Track } from "../backend/types";
 import { backend } from "./engine";
 import { type MessageId, notify, report } from "./feedback";
 import { openPremium } from "./links";
 import { askToSignIn, ready, signedIn } from "./session";
 
-const optimistic = signal<Partial<PlayerState>>({});
+/** A control's change on its way: shown until the backend agrees, or a
+ * moment after its request is done (the backend wins), or a time limit. */
+interface Pending {
+  change: Partial<PlayerState>;
+  started: number;
+  settled: number | null;
+}
 
-// The backend's next message replaces every optimistic value.
+/** How long after its request is done a change still shows when the
+ * backend disagrees (its state may lag the request a little), ms. */
+const SETTLE_GRACE = 1500;
+/** The longest a change shows without the backend agreeing, ms. */
+const PENDING_LIMIT = 8000;
+
+const pending = signal<Pending[]>([]);
+
+function agrees(state: PlayerState, change: Partial<PlayerState>): boolean {
+  for (const key of Object.keys(change) as (keyof PlayerState)[]) {
+    if (key === "at") continue;
+    if (key === "positionMs") {
+      if (Math.abs(positionAt(state, Date.now()) - (change.positionMs ?? 0)) > 2000) return false;
+      continue;
+    }
+    if (state[key] !== change[key]) return false;
+  }
+  return true;
+}
+
+/** Drops the changes the backend has caught up with, or that are over. */
+function prune(): void {
+  const state = backend.player();
+  const now = Date.now();
+  const kept = pending().filter(
+    (p) =>
+      !agrees({ ...EMPTY_PLAYER, ...state }, p.change) &&
+      now - p.started < PENDING_LIMIT &&
+      (p.settled === null || now - p.settled < SETTLE_GRACE),
+  );
+  if (kept.length !== pending().length) pending.set(kept);
+}
+
+// Every backend message checks the changes on their way.
 effect(() => {
   backend.player();
-  untracked(() => {
-    if (Object.keys(optimistic()).length > 0) optimistic.set({});
-  });
+  untracked(prune);
 });
 
+const optimistic = computed<Partial<PlayerState>>(() => Object.assign({}, ...pending().map((p) => p.change)));
+
+/** Tracks of collections the app has shown, by collection URI: what plays
+ * is found among them when the backend can't name it. */
+const shownTracks = new Map<string, Track[]>();
+const shownVersion = signal(0);
+
+/** Remembers a collection's tracks (its page shows them). */
+export function rememberTracks(contextUri: string, tracks: Track[]): void {
+  if (!contextUri || shownTracks.get(contextUri) === tracks) return;
+  shownTracks.set(contextUri, tracks);
+  untracked(() => shownVersion.update((v) => v + 1));
+}
+
+/** The last thing played from the app: what it is, and from where. */
+const lastPick = signal<{ trackUri: string; contextUri: string; title: string } | null>(null);
+
+/** Fills in what the backend could not name (the web player's widget does
+ * not always say which track or collection plays): the collection is the
+ * one last played from the app, and the track the one of its tracks with
+ * the playing title, so the "playing here" marks hold. */
+function named(state: PlayerState): PlayerState {
+  if (state.ad || !state.title) return state;
+  const pick = lastPick();
+  let { trackUri, contextUri } = state;
+  if (!contextUri && pick) contextUri = pick.contextUri;
+  if (!trackUri) {
+    shownVersion();
+    const found = shownTracks.get(contextUri)?.find((t) => t.name === state.title);
+    if (found) trackUri = found.uri;
+    else if (pick && pick.title === state.title) trackUri = pick.trackUri;
+  }
+  return trackUri === state.trackUri && contextUri === state.contextUri ? state : { ...state, trackUri, contextUri };
+}
+
 /** The player as shown: the backend's state with the values of controls
- * still on their way over it (tracked). */
-export const player = computed<PlayerState>(() => ({ ...EMPTY_PLAYER, ...backend.player(), ...optimistic() }));
+ * still on their way over it, and what it could not name filled in
+ * (tracked). */
+export const player = computed<PlayerState>(() => named({ ...EMPTY_PLAYER, ...backend.player(), ...optimistic() }));
 
 const playing = computed(() => player().playing);
 const now = signal(Date.now());
@@ -92,17 +167,23 @@ function allowed(): boolean {
  * drops `change` (where no later control replaced it) and says so. */
 function send(change: Partial<PlayerState>, action: () => Promise<void>, failure: MessageId = "playFailed"): void {
   if (!allowed()) return;
-  if (Object.keys(change).length > 0) optimistic.update((o) => ({ ...o, ...change }));
-  action().catch((error) => {
-    optimistic.update((o) => {
-      const next: Record<string, unknown> = { ...o };
-      for (const key of Object.keys(change) as (keyof PlayerState)[]) {
-        if (next[key] === change[key]) delete next[key];
-      }
-      return next as Partial<PlayerState>;
-    });
-    report(failure, error);
-  });
+  // On screen first, in the same frame as the press; the request goes out
+  // at once alongside.
+  const entry: Pending | null = Object.keys(change).length > 0 ? { change, started: Date.now(), settled: null } : null;
+  if (entry) pending.update((list) => [...list, entry]);
+  action().then(
+    () => {
+      if (!entry) return;
+      entry.settled = Date.now();
+      // Give the backend's state a moment to catch up, then let it win.
+      setTimeout(prune, SETTLE_GRACE + 50);
+      prune();
+    },
+    (error) => {
+      if (entry) pending.update((list) => list.filter((p) => p !== entry));
+      report(failure, error);
+    },
+  );
 }
 
 export function toggle(): void {
@@ -183,34 +264,54 @@ export function toggleLike(): void {
 
 let freeNoticeShown = false;
 
-/** Tells a free account, once a session, that it shuffles. */
-function noteFreeTier(): void {
+/** Tells a free account, once a session, that it shuffles, but only when
+ * it did: when what plays after a pick is another song than the one picked
+ * (the web player often plays the very song a free account picks). Waits
+ * out an ad that plays first. */
+function noteIfShuffled(picked: string, tries = 6): void {
   if (freeNoticeShown || player().premium !== false) return;
-  freeNoticeShown = true;
-  notify("freeShuffles", { label: "Get Premium", run: openPremium });
+  setTimeout(() => {
+    const now = player();
+    if (freeNoticeShown) return;
+    if ((now.ad || !now.trackUri) && tries > 0) return noteIfShuffled(picked, tries - 1);
+    if (now.ad || !now.trackUri || now.trackUri === picked) return;
+    freeNoticeShown = true;
+    notify("freeShuffles", { label: "Get Premium", run: openPremium });
+  }, 2500);
+}
+
+/** What shows the moment a track is picked: it is the one loaded and it
+ * plays (its row marks it, the bar shows it), until the backend says what
+ * actually plays. */
+function picked(trackUri: string, contextUri: string, track?: Track): Partial<PlayerState> {
+  lastPick.set({ trackUri, contextUri, title: track?.name ?? "" });
+  const change: Partial<PlayerState> = { trackUri, contextUri, playing: true, positionMs: 0, at: Date.now() };
+  if (track) Object.assign(change, { title: track.name, artist: track.artists, album: track.album, artwork: track.image, durationMs: track.durationMs });
+  return change;
 }
 
 /** Plays a whole collection. */
 export function playCollection(uri: string): void {
-  send({}, () => backend.playContext(uri, null));
+  lastPick.set({ trackUri: "", contextUri: uri, title: "" });
+  send({ contextUri: uri, playing: true }, () => backend.playContext(uri, null));
 }
 
-/** Plays `trackUri` within the collection `contextUri`; a free account
- * plays the collection shuffled, and hears why once. */
-export function playFrom(contextUri: string, trackUri: string): void {
+/** Plays `trackUri` within the collection `contextUri`; when a free
+ * account gets another song (shuffled), it hears why, once. */
+export function playFrom(contextUri: string, trackUri: string, track?: Track): void {
   if (!allowed()) return;
-  noteFreeTier();
-  send({}, () => backend.playContext(contextUri, trackUri));
+  send(picked(trackUri, contextUri, track), () => backend.playContext(contextUri, trackUri).then(() => noteIfShuffled(trackUri)));
 }
 
 /** Plays a track found outside a collection: Premium plays it on its own;
  * a free account plays its album, the track's context. */
-export function playTrack(track: { uri: string; albumUri?: string }): void {
+export function playTrack(track: { uri: string; albumUri?: string } & Partial<Track>): void {
+  const full = "name" in track && track.name ? (track as Track) : undefined;
   if (player().premium === true || !track.albumUri) {
-    send({}, () => backend.playTrack(track.uri));
+    send(picked(track.uri, player().contextUri, full), () => backend.playTrack(track.uri));
     return;
   }
-  playFrom(track.albumUri, track.uri);
+  playFrom(track.albumUri, track.uri, full);
 }
 
 /** Plays a card: its collection, or the track it is. */

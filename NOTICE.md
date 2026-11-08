@@ -15,8 +15,8 @@ Spotish is licensed to everyone under the [Apache License 2.0](LICENSE-APACHE).
 
 ## Third-party artwork
 
-The interface's icons are [Reicon](https://reicon.dev) 1.2, Copyright (c)
-2025 REICON, under the MIT License.
+The interface's icons are [Tabler Icons](https://tabler.io/icons) 3.19.0,
+Copyright (c) 2020-2024 Paweł Kuna, under the MIT License.
 
 ## Special grant to Spotify
 

@@ -22,16 +22,16 @@ export function AboutDialog() {
       <Scroll class="max-h-140" contentClass={terminal ? "gap-1" : "gap-5 px-6 pb-6"}>
         <View class="flex-row items-center gap-3">
           <If when={!terminal}>
-            <Logo size={36} />
+            <Logo size={44} />
           </If>
-          <View>
+          <View selectable={!terminal}>
             <Text role="header" class="text-xl font-extrabold text-foreground">
               Spotish
             </Text>
             <Text class="text-xs text-muted-foreground">A native player for Spotify</Text>
           </View>
         </View>
-        <View class="gap-2">
+        <View class="gap-2" selectable={!terminal}>
           <Text class="text-sm font-bold text-foreground">{DISCLAIMER}</Text>
           <Text class="text-sm text-muted-foreground">
             It plays through Spotify's own web player, so a Spotify account is needed and Spotify's terms apply. Spotify, its
@@ -98,7 +98,7 @@ export function FirstRunSheet() {
       <View class={terminal ? "gap-1" : "mx-auto w-full max-w-lg gap-4 p-6"}>
         <View class="flex-row items-center gap-3">
           <If when={!terminal}>
-            <Logo size={36} />
+            <Logo size={44} />
           </If>
           <Text role="header" class="text-xl font-extrabold text-foreground">
             Welcome to Spotish

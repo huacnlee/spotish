@@ -30,8 +30,13 @@ the code.
   translucent disc with a light glyph and a fine light border, which reads
   over any cover, light or dark.
 - Liked is red (`liked` token), with a white heart on Liked Songs' cover.
+- The like button is always the filled heart: white (dimmed until hovered)
+  while not liked, red once liked. Never an outline.
 - Menus and popovers are a solid, dark surface (`popover`, a step above the
   window), not a pale grey.
+- The account menu has no row icons: labels only, starting on the avatar's
+  left edge above (rows and header share the 10pt inset). No ↗ marks
+  either: a menu row is its words.
 
 ## The music light (shaders)
 
@@ -45,6 +50,23 @@ the code.
 - It moves with the music, with crests: louder bands rise as peaks, the beat
   swells them. Every effect must have music-driven peaks. Edges are smooth
   (no hard top edge).
+- Thirteen effects, chosen from the ✦ menu on the player bar and in Now
+  Playing ("Music light": one numbered line per effect, 01 to 13, the one in
+  use marked with a check on the right, scrolling when taller than the
+  room; remembered, the same one in both). Dots, Grid and Wave first (the
+  best; Dots the default), then Orb (a sphere fully covered in dots,
+  turning, its surface pushed out by the spectrum), Spectrum, Bars, Ribbons, Halo (a wave
+  running into a smooth ring), Aurora (rays under a crisp hem), Mountains
+  (many fine ridgelines in perspective), Mesh (the same terrain as a net of
+  rows and columns), Particles (a wave of dots in perspective) and Strings
+  (vibrating strings). Lines are crisp: a thin bright core in a soft glow,
+  never only a blur. Their flow comes from a clock read with the music's
+  levels, never `nsh.time`.
+- Each effect has its own height in Now Playing (the terrains and the
+  aurora fill the room, the lines take about half), and never reaches past
+  the top of the strip it is drawn in.
+- Grid's blocks are sized to the surface (small in the player bar, larger
+  in Now Playing) and snapped to whole device pixels at any zoom.
 - It rests when nothing plays and when the user asks for less motion.
 - Nothing may redraw every display frame without need. A shader that reads
   `nsh.time` repaints the whole window at the display's rate, so pause its
@@ -62,15 +84,28 @@ the code.
   darkened toward the player colour for legibility, the music light inside.
   Not a gradient, not a sheen.
 - Its border is a single 1px line that catches light. No glow on the border.
-- The volume slider stays collapsed and opens on hover, focus or drag. Its
+- The controls are quiet, here as in Now Playing: the light leads. A faint
+  play disc (no border or shadow), thin faint sliders.
+- The volume's slider always shows in the player bar (about 96pt),
+  balancing what plays on the left; nothing hides or slides. Its
   thumb stays inside the bar at 0 and at 100%.
 
 ## Now Playing
 
 - Full screen, the controls laid directly on the page. No floating card or
   glass panel.
-- The music light is the page's background, rising from the bottom.
-- A back chevron closes it.
+- The music light is the page's background and its lead, rising from the
+  bottom up to nearly half the window. The controls stay quiet so they
+  don't compete with it: a long, thin, faint position bar; a faint play
+  disc with no border or shadow; smaller transport icons; the volume
+  collapsed until hovered.
+- Now Playing closes from a down chevron at the top left: it goes back
+  down into the bar, not "back" to a page. In the
+  bar, the whole left block (cover, title, artist) opens it.
+- Words that are only read can be selected and copied: Now Playing's title
+  and artist, a collection's header, About. Rows and buttons are not.
+- The volume sits in the top-right corner beside the light menu, always
+  open (no hover reveal), out of the music's way.
 
 ## Controls
 
@@ -78,6 +113,7 @@ the code.
   is drawn (the bar itself is the control). If a thumb ever returns, never
   scale it: NSH centres it with a transform that a scale replaces.
 - The volume bar is short (about 64pt).
+- A slider keeps one height (it doesn't grow on hover).
 - Nested radii are concentric: inner radius = outer radius − gap
   (`--radius-card`, `--radius`, `--radius-inset`).
 - Lists have a small gap between rows (4pt).
@@ -86,31 +122,102 @@ the code.
   its icon or cover in the same 30pt column, so labels line up. A panel's
   inset is the same on every side (8pt: a hovered row keeps clear of the
   border), and its radius is the row's plus that inset (16 = 8 + 8).
+- Times (position, duration, a track's length) are monospace, equal-width
+  figures (`Digits`, `src/components/ui/digits.tsx`), so they don't jitter.
 
 ## Motion
 
 - Every interactive control has layered hover and press feedback: a
-  translucent wash, a scale or lift, and its icon moving once.
+  translucent wash, a press, and its icon moving once.
+- Buttons move like affectui's clean button: hover only brings a wash (or a
+  shade, a slightly deeper shadow) in, 120ms ease-out, never a grow; a press
+  takes the whole button to 0.97 (an icon button's disc and glyph to 0.95)
+  over 180ms on the smooth-out curve (0.22, 1, 0.36, 1), and the wash
+  deepens. A labelled button's new label rises 4pt as it fades in (360ms).
+- A glyph that changes (play and pause, the heart, repeat, the volume's
+  levels, mute) swaps like transitions.dev's "Icon swap" (`SwapIcon`): the
+  old one shrinks to 0.25, blurs to 2px and fades as the new one grows from
+  0.25 and sharpens, together, 240ms ease-in-out. NSH can't animate a blur,
+  so it steps 4 times through the swap; nothing runs at rest. The hover
+  morph stays on the glyph showing. A glyph that only changes colour (the
+  like heart turning red, a toggle turning on) fades the old colour off over
+  180ms ease-out instead of snapping.
 - Icon hover motion is subtle and plays once per entry (lift, swing, nudge,
   beat, turn), modelled on allsum-nsh's icon motion. No big presets.
-- Layers move separately. On a card, the card lifts, the cover grows a
-  little more slowly, and the play button rises and grows over both.
+- Layers move separately, and hover is steady: a card doesn't lift or
+  change size; a wash comes in, the cover grows a hair (1%), and the play
+  button rises and grows over it.
 - Pages and their items enter with a short stagger; dialogs rise and fade
-  in; toasts slide in and out; skeletons breathe.
+  in; toasts slide in and out.
+- Everything that loads (home, a collection and an artist's Popular, search
+  results, the library) follows transitions.dev's "Skeleton loader and
+  reveal" (`Reveal` in `ui/feedback.tsx`): a skeleton shaped like its rows or
+  cards pulses (each shape to half opacity and back, 1s ease-in-out), then
+  fades out as the content fades in over it, 360ms ease-in-out. The
+  reference's 2px cross-blur is left out (NSH can't animate a filter).
+  Content already cached shows at once, without a skeleton.
+- List rows (tracks in a collection, an artist's Popular and search; the
+  library) enter in an irregular wave, top to bottom: each fades in moving
+  right to left (NSH's `fadeInRight`), passing its place by 1pt before it
+  settles, on the smooth-out curve. Turns are 55ms apart (the first 12 rows
+  in view; any below come in with the 12th), and each row adds its own fixed
+  lag of up to 90ms and travels 12-20pt over about 405-475ms, so neighbours
+  can trade places while the list still flows downward. The scatter is a
+  hash of the row's place: the same on every render, never reshuffled.
+  Cards (home's rows, search's rows, an artist's releases) wave the same
+  irregular way left to right with NSH's `fadeInUp` (rising), the first 8
+  taking turns; home's sections start 55ms apart down the page. Rows and
+  cards share one stagger (`WAVE`, `createListWave`, `listItemEntrance` in
+  `ui/motion.ts`). In both, each cover flips open at its own pace (NSH's
+  `flipInY`, its left edge swinging in from -90°, past by 8° before it
+  settles, under a 600pt perspective), starting its own 120-220ms after its
+  row or card and turning over its own 330-550ms.
+- The wave plays every time a page is entered: opened, gone back (or
+  forward) to in the stack, or shown again from a cached page; content that
+  loaded starts its wave as the skeleton is half gone, and a new search's
+  results wave in as they replace the old. An item that comes into view
+  later (scrolled down to, scrolled across in a card row) comes in on its
+  own with the same motion and only a little jitter (up to 60ms). Each item
+  comes in once per entry: a recycled cell given an item already shown, a
+  re-render or a playback tick plays nothing.
+- The sidebar's selection is transitions.dev's "Tabs sliding": rows don't
+  light their own background (hover still washes them); each panel has one
+  background that slides to the selected row (240ms ease-in-out). In the
+  library it sits behind the recycling list at the selected item's place
+  (8 + 48 x its index), follows the scroll natively without easing, and is
+  clipped by the panel when scrolled away. With no selection in a panel (a
+  library page while Home's panel shows, or a page not in the library) it
+  fades away; moving between panels, one fades out as the other fades in
+  where it lands.
+- Menus (the light menu, the account menu) open with transitions.dev's
+  "Dropdown menu morph", from `ui/menu.ts`: the popup grows out of the
+  trigger's nearest corner, slid 8pt toward it, at 0.97 scale and 2px blur,
+  fading in over 360ms on a slight overshoot; it leaves the same way in
+  240ms without one.
 - Navigation direction follows history: returning to a page already in the
   stack animates back, a page ahead animates forward.
+- Liking is transitions.dev's "Like button": the heart squashes to 0.82 and
+  springs back past its size (360ms, overshoot curve) while 8 red dots spray
+  out about 20pt, each with its own angle, reach, size and delay (about
+  600ms). It plays only when the user's own press turns Like on; unliking
+  just dips the heart (0.95, 180ms). Nothing plays on track change.
 - Everything respects reduced motion.
 
 ## Icons and logo
 
-- Icons are [Reicon](https://reicon.dev) (MIT): Outline, with Filled for
-  the transport and the liked heart. One family across the app.
+- Icons are [Tabler Icons](https://tabler.io/icons) (MIT): Outline drawn
+  at a 1.5pt stroke, with Filled for the transport and the liked heart. One
+  family across the app; a missing glyph comes from Tabler too, never drawn
+  by hand.
 - Icon hover motion follows the glyph's own shape, never a generic move
   pasted on: skip leaves an echo the way it goes, shuffle's lines cross,
   repeat's arrows turn once, the volume's waves come in one by one, the heart
   beats. Small and once per entry.
-- The logo is a pair of beamed eighth notes (🎵) on a green rounded square.
-  The app and the website favicon use the same mark.
+- The logo is a pair of beamed sixteenth notes on a green rounded square
+  with two faint record grooves round the middle, centred by eye. In the
+  app the green is the theme's `primary` (the links' green), from a light to
+  a deep shade of it; the favicon uses the same mark in #5da602. Beside a
+  title and its subtitle it is as tall as both lines (44pt).
 
 ## Layout and density
 
@@ -136,6 +243,12 @@ Spotish is NSH's showcase: it must be fast and light.
 - Anything that can grow is a virtualized `List`: the library, a
   collection's tracks, the home page's sections and every row of cards
   (horizontal). Only what is near the view exists.
+- Lists of equal items snap as they scroll (`snapToInterval` +
+  `snapToAlignment="start"`): a card row stops at a card's start, the
+  library at a whole row. Snapped items never touch the edge: a card row
+  runs out to the page's edges and insets its cards by the gutter (12pt),
+  so every stop leaves that margin. A list under a header of unknown height (a
+  collection's tracks) does not snap, or every stop would cut a row.
 - Pictures are loaded at the size they show: small covers (up to 40pt) ask
   Spotify for the 64px variant (`src/data/images.ts`).
 - Nothing redraws without a change to show (see the music light above).

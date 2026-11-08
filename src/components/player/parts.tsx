@@ -2,7 +2,7 @@
 // Now Playing and the terminal: the transport, the position, the volume,
 // Like and what plays. They read the player store and call its intents.
 
-import { cleanup, createMotion, effect, signal, Text, View } from "nsh";
+import { cleanup, createMotion, effect, type MotionSpec, reduceMotion, signal, Text, View } from "nsh";
 import { Button } from "nsh/base";
 import { clock } from "../../backend/types";
 import { openPremium } from "../../state/links";
@@ -26,15 +26,18 @@ import {
   volumeLevel,
 } from "../../state/player";
 import { ready } from "../../state/session";
+import { Digits } from "../ui/digits";
 import { BarSlider, Cover, focusRing, IconButton, PlayButton, terminal, TextLink } from "../ui/controls";
 import type { IconName } from "../ui/icons";
+import { DURATION, EASING, SCALE } from "../ui/tokens";
 
 const REPEAT_LABEL = { off: "Repeat", context: "Repeat one", track: "Don't repeat" } as const;
 
-/** Shuffle, previous, play / pause, next and repeat. */
-export function TransportControls(props: { large?: boolean; minimal?: boolean }) {
-  const icon = () => (props.large ? 26 : 18);
-  const side = () => (props.large ? 22 : 18);
+/** Shuffle, previous, play / pause, next and repeat. `quiet`: a faint play
+ * button (Now Playing). */
+export function TransportControls(props: { large?: boolean; minimal?: boolean; quiet?: boolean }) {
+  const icon = () => (props.large ? 22 : 18);
+  const side = () => (props.large ? 18 : 18);
   const usable = () => controlsEnabled() && !player().ad;
   return (
     <View class={`flex-row items-center ${props.large ? "gap-6" : "gap-4"}`} role="toolbar" accessibilityLabel="Playback">
@@ -50,7 +53,7 @@ export function TransportControls(props: { large?: boolean; minimal?: boolean })
         />
       </If>
       <IconButton name="skipBack" label="Previous" short="Prev" size={icon()} disabled={!usable() || !player().canPrevious} onPress={previous} />
-      <PlayButton tinted playing={player().playing} size={props.large ? 68 : 36} disabled={!ready() || !hasTrack()} onPress={toggle} />
+      <PlayButton tinted quiet={props.quiet} playing={player().playing} size={props.large ? 56 : 36} disabled={!ready() || !hasTrack()} onPress={toggle} />
       <IconButton name="skipForward" label="Next" size={icon()} disabled={!usable() || !player().canNext} onPress={next} />
       <If when={!props.minimal}>
         <IconButton
@@ -70,15 +73,16 @@ export function TransportControls(props: { large?: boolean; minimal?: boolean })
 
 /** The playback position: a slider with the elapsed and total times beside
  * it (`inline`) or under it. Seeking is off during an ad. */
-export function SeekBar(props: { inline?: boolean }) {
+export function SeekBar(props: { inline?: boolean; quiet?: boolean }) {
   const duration = () => Math.max(1, player().durationMs);
-  const elapsed = () => <Text class="text-xs tabular-nums font-mono text-muted-foreground">{clock(position())}</Text>;
-  const total = () => (
-    <Text class="text-xs tabular-nums font-mono text-muted-foreground">{clock(hasTrack() ? player().durationMs : 0)}</Text>
-  );
+  // The times in LED digits (`Digits`).
+  const times = () => `text-xs text-muted-foreground ${props.quiet ? "opacity-60" : ""}`;
+  const elapsed = () => <Digits class={times()}>{clock(position())}</Digits>;
+  const total = () => <Digits class={times()}>{clock(hasTrack() ? player().durationMs : 0)}</Digits>;
   const slider = (
     <BarSlider
       tinted
+      quiet={props.quiet}
       label="Playback position"
       value={position()}
       max={duration()}
@@ -108,8 +112,8 @@ export function SeekBar(props: { inline?: boolean }) {
   );
 }
 
-/** Mute and the volume slider. */
-export function VolumeControl(props: { class?: string; collapsible?: boolean }) {
+/** Mute and the volume slider. `quiet`: a thin, faint slider. */
+export function VolumeControl(props: { class?: string; collapsible?: boolean; quiet?: boolean }) {
   const icon = (): IconName => {
     const v = volumeLevel();
     if (v <= 0) return "volumeMute";
@@ -134,14 +138,18 @@ export function VolumeControl(props: { class?: string; collapsible?: boolean }) 
         onPress={toggleMute}
       />
       <If when={!terminal}>
+        {/* Its room stays; the slider slides out from the speaker and fades
+            in (a width change would jump: layout does not animate). */}
         <View
-          class={`overflow-hidden transition-all duration-200 ease-out motion-reduce:transition-none ${
-            open() ? "w-18 opacity-100" : "w-0 opacity-0 focus-within:w-18 focus-within:opacity-100"
+          class={`${props.collapsible ? "w-18" : "w-24"} pl-1 pr-3 transition duration-300 ease-out motion-reduce:transition-none ${
+            open()
+              ? "translate-x-0 opacity-100"
+              : "-translate-x-2 opacity-0 focus-within:translate-x-0 focus-within:opacity-100"
           }`}
         >
-          <View class="w-18 pl-1 pr-3">
             <BarSlider
               tinted
+              quiet={props.quiet}
               label="Volume"
               value={volumeLevel()}
               max={1}
@@ -156,70 +164,211 @@ export function VolumeControl(props: { class?: string; collapsible?: boolean }) 
                 setVolume(v);
               }}
             />
-          </View>
         </View>
       </If>
     </View>
   );
 }
 
-/** Saves the track to Liked Songs, or removes it; the heart beats as it
- * turns on. */
+/** Saves the track to Liked Songs, or removes it. Liking pops the heart and
+ * sprays a burst of red dots (transitions.dev's "Like button"); unliking only
+ * dips it. Both play from the press alone, never when a track changes. */
 export function LikeButton(props: { size?: number }) {
-  const beat = createMotion();
-  let was = player().liked;
-  effect(() => {
-    const now = player().liked;
-    if (now && !was) void beat.play("heartbeat", { duration: 600 });
-    was = now;
+  const pop = createMotion();
+  const dots = Array.from({ length: LIKE_DOTS }, () => createMotion({ initial: { opacity: 0 } }));
+  cleanup(() => {
+    pop.stop();
+    for (const d of dots) d.stop();
   });
-  cleanup(() => beat.stop());
+  // The reference is drawn for a 16pt heart; scale its distances to ours.
+  const k = () => (props.size ?? 18) / 16;
+  const dotSize = () => LIKE_DOT_SIZE * k();
+  // The dots exist only while a burst flies: nothing of them is on screen at
+  // rest, whatever a motion's resting opacity is. `burstId` lets only the
+  // latest burst take them away when it ends.
+  const bursting = signal(false);
+  let burstId = 0;
+  const press = () => {
+    const liking = !player().liked;
+    toggleLike();
+    // Nothing changed (controls locked): nothing moves.
+    if (player().liked !== liking || terminal || reduceMotion()) return;
+    const id = ++burstId;
+    if (!liking) {
+      // As the reference drops its burst: the dots go at once.
+      for (const d of dots) d.stop();
+      bursting.set(false);
+      void pop.play(UNLIKE_DIP);
+      return;
+    }
+    void pop.play(LIKE_POP);
+    bursting.set(true);
+    // Each like re-rolls every dot's angle, reach, size, speed and start, so
+    // the spray never repeats.
+    void Promise.all(dots.map((d, i) => d.play(burst(i, k())))).then(() => {
+      if (id === burstId) bursting.set(false);
+    });
+  };
   return (
-    <View style={beat.style}>
-    <IconButton
-      name={player().liked ? "heartFilled" : "heart"}
-      label={player().liked ? "Remove from Liked Songs" : "Save to Liked Songs"}
-      short={player().liked ? "Liked" : "Like"}
-      size={props.size ?? 18}
-      pressed={player().liked}
-      pressedColor="liked"
-      disabled={!controlsEnabled() || player().ad}
-      onPress={toggleLike}
-    />
+    <View class="items-center justify-center">
+      <View style={pop.style}>
+        <IconButton
+          // Always the filled heart: white while not liked, red once it is.
+          name="heartFilled"
+          label={player().liked ? "Remove from Liked Songs" : "Save to Liked Songs"}
+          short={player().liked ? "Liked" : "Like"}
+          size={props.size ?? 18}
+          pressed={player().liked}
+          pressedColor="liked"
+          disabled={!controlsEnabled() || player().ad}
+          onPress={press}
+        />
+      </View>
+      <If when={!terminal && bursting()}>
+        {dots.map((d) => (
+          <View
+            class="pointer-events-none absolute rounded-full bg-liked"
+            // Mounted only while a burst plays; it starts and ends at opacity 0.
+            style={{ width: dotSize(), height: dotSize(), ...d.style }}
+          />
+        ))}
+      </If>
     </View>
   );
 }
+
+// transitions.dev "Like button" (p23), ported. Reference tokens: pop 350ms
+// cubic-bezier(0.34, 1.96, 0.64, 1) 1 → 0.82 (at 30%) → 1; fill 150ms;
+// 8 dots of 2.5px flung 20px over 600ms ease-out; per dot ±16° of angle,
+// 0.68–1.18 of the reach, 0.78–1.22 of the duration, 0–70ms of delay,
+// 0.6–1.4 of the size, and an end scale of 0.35–0.75.
+const LIKE_DOTS = 8;
+const LIKE_DOT_SIZE = 2.5;
+const LIKE_REACH = 20;
+const LIKE_BURST_MS = 600;
+/** The reference's spring-like overshoot curve, segment by segment. */
+const LIKE_SPRING: [number, number, number, number] = [0.34, 1.96, 0.64, 1];
+
+/** The heart squashes, then springs back past its size and settles. */
+const LIKE_POP: MotionSpec = {
+  keyframes: [{ scale: 1 }, { scale: 0.82, offset: 0.3 }, { scale: 1 }],
+  duration: DURATION.slow,
+  easing: LIKE_SPRING,
+};
+
+/** Unliking: a small, quiet dip, no burst. */
+const UNLIKE_DIP: MotionSpec = {
+  keyframes: [{ scale: 1 }, { scale: SCALE.press }, { scale: 1 }],
+  duration: DURATION.fast,
+  easing: EASING.out,
+};
+
+/** Dot `i`'s flight: it appears a quarter of the way out, then drifts the
+ * rest of its reach, shrinking and fading. */
+function burst(i: number, k: number): MotionSpec {
+  const rand = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
+  const angle = (((360 / LIKE_DOTS) * i + rand(-16, 16)) * Math.PI) / 180;
+  const reach = LIKE_REACH * k * rand(0.68, 1.18);
+  const x = Math.cos(angle) * reach;
+  const y = Math.sin(angle) * reach;
+  const size = rand(0.6, 1.4);
+  return {
+    keyframes: [
+      { opacity: 0, translateX: 0, translateY: 0, scale: 0.4 * size },
+      { opacity: 1, translateX: x * 0.25, translateY: y * 0.25, scale: size, offset: 0.2 },
+      { opacity: 0, translateX: x, translateY: y, scale: rand(0.35, 0.75) * size },
+    ],
+    duration: Math.round(LIKE_BURST_MS * rand(0.78, 1.22)),
+    delay: Math.round(rand(0, 70)),
+    easing: EASING.out,
+  };
+}
+
+/** A new track's arrival: the cover settles in with a small overshoot,
+ * the words rise after it. */
+export const NEW_COVER: MotionSpec = {
+  keyframes: [
+    { opacity: 0.4, scale: 0.9 },
+    { opacity: 1, scale: 1.04 },
+    { opacity: 1, scale: 1 },
+  ],
+  duration: 420,
+  easing: "easeOut",
+};
+const NEW_WORDS: MotionSpec = {
+  keyframes: [
+    { opacity: 0, translateY: 6 },
+    { opacity: 1, translateY: 0 },
+  ],
+  duration: 320,
+  delay: 80,
+  easing: "easeOut",
+};
 
 /** What plays: the cover (`cover` points; 0 for none), which opens Now
  * Playing when `openable`, the title and the artist; during an ad, the ad's own artwork and title, and a link to
  * Premium. */
 export function NowPlayingSummary(props: { cover?: number; round?: boolean; openable?: boolean; large?: boolean }) {
   const subtitle = () => (player().ad ? "Advertisement" : player().artist);
-  const cover = () => <Cover src={player().artwork} size={props.cover ?? 56} round={props.round} />;
-  return (
-    <View class="min-w-0 flex-1 flex-row items-center gap-3">
-      <If when={!terminal && props.cover !== 0}>
-        <If when={props.openable && hasTrack()} else={cover()}>
-          <Button
-            accessibilityLabel="Open Now Playing"
-            onPress={() => setNowPlayingOpen(true)}
-            class={`rounded-md hover:opacity-85 active:scale-95 motion-reduce:active:scale-100 ${focusRing}`}
-          >
-            {cover()}
-          </Button>
+  // Each new track arrives: the cover, then the words (not the first one
+  // shown, which comes in with the player).
+  const coverIn = createMotion();
+  const wordsIn = createMotion();
+  let shown = `${player().title}|${player().artwork}`;
+  effect(() => {
+    const now = `${player().title}|${player().artwork}`;
+    if (now !== shown && player().title && !terminal) {
+      void coverIn.play(NEW_COVER);
+      void wordsIn.play(NEW_WORDS);
+    }
+    shown = now;
+  });
+  cleanup(() => {
+    coverIn.stop();
+    wordsIn.stop();
+  });
+  const cover = () => (
+    <View style={coverIn.style}>
+      <Cover src={player().artwork} size={props.cover ?? 56} round={props.round} />
+    </View>
+  );
+  const words = (selectable: boolean) => (
+    <View class="min-w-0 flex-1 gap-0.5" style={wordsIn.style} selectable={selectable}>
+      <Text class={`line-clamp-1 font-semibold text-foreground ${props.large ? "text-3xl font-extrabold" : "text-sm"}`}>
+        {player().title || "Nothing playing"}
+      </Text>
+      <View class="min-w-0 flex-row items-center gap-2">
+        <Text class={`line-clamp-1 min-w-0 shrink text-muted-foreground ${props.large ? "text-base" : "text-xs"}`}>{subtitle()}</Text>
+        <If when={player().ad}>
+          <TextLink label="Get Premium" onPress={openPremium} />
         </If>
-      </If>
-      <View class="min-w-0 flex-1 gap-0.5">
-        <Text class={`line-clamp-1 font-semibold text-foreground ${props.large ? "text-3xl font-extrabold" : "text-sm"}`}>
-          {player().title || "Nothing playing"}
-        </Text>
-        <View class="min-w-0 flex-row items-center gap-2">
-          <Text class={`line-clamp-1 min-w-0 shrink text-muted-foreground ${props.large ? "text-base" : "text-xs"}`}>{subtitle()}</Text>
-          <If when={player().ad}>
-            <TextLink label="Get Premium" onPress={openPremium} />
-          </If>
-        </View>
       </View>
     </View>
+  );
+  const withCover = () => !terminal && props.cover !== 0;
+  // Openable: the whole of it (cover and words) opens Now Playing; during an
+  // ad it stays plain, its Premium link pressable on its own.
+  return (
+    <If
+      when={props.openable && hasTrack() && !player().ad && !terminal}
+      else={
+        <View class="min-w-0 flex-1 flex-row items-center gap-3">
+          <If when={withCover()}>{cover()}</If>
+          {/* Words that are only read can be selected and copied. */}
+          {words(!props.openable && !terminal)}
+        </View>
+      }
+    >
+      <Button
+        accessibilityLabel={`Open Now Playing: ${player().title}, ${player().artist}`}
+        onPress={() => setNowPlayingOpen(true)}
+        class={`group min-w-0 flex-1 flex-row items-center gap-3 rounded-full pr-2 active:scale-[0.98] motion-reduce:active:scale-100 ${focusRing}`}
+      >
+        <If when={withCover()}>
+          <View class="transition duration-150 ease-out group-hover:opacity-85 motion-reduce:transition-none">{cover()}</View>
+        </If>
+        {words(false)}
+      </Button>
+    </If>
   );
 }

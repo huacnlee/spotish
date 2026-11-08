@@ -2,8 +2,12 @@
 // Android show the system's, from the page's `title`): Back and Forward,
 // and the account's action.
 
-import { Text, View } from "nsh";
-import { back, canBack, canForward, forward } from "../nav";
+import { createMotion, signal, Text, token, untracked, View } from "nsh";
+import { Input } from "nsh/base";
+import { back, canBack, canForward, currentRoute, forward, open, SEARCH } from "../nav";
+import { DISTANCE, DURATION, EASING } from "./ui/tokens";
+import { query } from "../state/search";
+import { Icon } from "./ui/icons";
 import { openPremium } from "../state/links";
 import { player } from "../state/player";
 import { signedIn, signIn } from "../state/session";
@@ -21,6 +25,72 @@ export function AccountAction() {
       <If when={signedIn() === false}>
         <ActionButton label="Log in" variant="primary" onPress={signIn} />
       </If>
+    </View>
+  );
+}
+
+/** The desktop's search, in the header's top-right corner: a Search
+ * button that opens into a field. Return searches (opens Search with what
+ * was typed); on the search page the field stays open and the results
+ * follow the typing. Leaving it empty (it loses the focus, or Escape)
+ * folds it back. */
+export function SearchField() {
+  const onSearch = () => currentRoute().name === "search";
+  const expanded = signal(onSearch() && query().trim() !== "");
+  return (
+    <If when={expanded() || onSearch()} else={<IconButton name="search" label="Search" hint onPress={() => expanded.set(true)} />}>
+      <SearchBox
+        onSearch={onSearch()}
+        onDone={() => expanded.set(false)}
+      />
+    </If>
+  );
+}
+
+/** The opened field: it grows out from the right, focused. */
+function SearchBox(props: { onSearch: boolean; onDone: () => void }) {
+  const draft = signal(untracked(() => query()));
+  const grow = untracked(() =>
+    terminal
+      ? undefined
+      : createMotion({
+          enter: {
+            keyframes: { opacity: [0, 1], scaleX: [0.7, 1], translateX: [DISTANCE.large, 0] },
+            duration: DURATION.base,
+            easing: EASING.out,
+          },
+        }).style,
+  );
+  const submit = (text: string) => {
+    const term = text.trim();
+    if (!term) return;
+    query.set(text);
+    if (!props.onSearch) open(SEARCH);
+  };
+  return (
+    <View
+      class="h-10 w-72 flex-row items-center gap-2 rounded-full border border-secondary bg-secondary px-3.5 transition duration-150 ease-out focus-within:border-foreground/40 motion-reduce:transition-none"
+      style={grow}
+    >
+      <Icon name="search" size={16} color="muted-foreground" />
+      <Input
+        value={props.onSearch ? query() : draft()}
+        onChange={({ value }) => (props.onSearch ? query.set(value) : draft.set(value))}
+        onSubmit={({ text }) => submit(text)}
+        onBlur={() => {
+          if (!(props.onSearch ? query() : draft()).trim()) props.onDone();
+        }}
+        onKeyPress={({ key }) => {
+          if (key === "Escape" && !props.onSearch) props.onDone();
+        }}
+        placeholder="What do you want to play?"
+        accessibilityLabel="Search Spotify"
+        returnKeyType="search"
+        submitBehavior="submit"
+        autoFocus
+        class="flex-1 text-sm text-foreground"
+        style={{ placeholderColor: token("muted-foreground"), caretColor: token("foreground") }}
+      />
     </View>
   );
 }
@@ -49,6 +119,9 @@ export function PageHeader(props: { title: string; showTitle?: boolean }) {
         </Text>
       </If>
       <View class="flex-1" />
+      <If when={desktop() && !terminal}>
+        <SearchField />
+      </If>
       <AccountAction />
     </View>
   );

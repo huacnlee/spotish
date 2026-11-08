@@ -2,6 +2,7 @@
 // recycling `List`, so it reads its track where it is used and keeps no
 // state of its own.
 
+import { Digits } from "../ui/digits";
 import { Text, untracked, View } from "nsh";
 import { Button } from "nsh/base";
 import { clock, type Track } from "../../backend/types";
@@ -9,15 +10,16 @@ import { isCurrentTrack, player } from "../../state/player";
 import { Cover, LAYER, focusRing, terminal } from "../ui/controls";
 import { PlayingBars } from "../ui/playing";
 import { Icon } from "../ui/icons";
-import { enter } from "../ui/motion";
+import { listItemEntrance, type ListWave, WAVE } from "../ui/motion";
 
 /** The header row above a track list. */
 export function TrackHeader(props: { showAlbum: boolean }) {
   if (terminal) return <View class="hidden" />;
   return (
     <View class="mx-3 mb-1 h-8 flex-row items-center gap-3 border-b border-border/60 px-3">
-      <Text class="w-6 text-right text-[11px] font-medium uppercase tracking-wider text-muted-foreground">#</Text>
-      <View class="w-9" />
+      {/* The number column has no heading; "Title" starts where the covers
+          do, so the cover column and the title share one left edge. */}
+      <View class="w-6" />
       <Text class="flex-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Title</Text>
       <If when={props.showAlbum}>
         <Text class="flex-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Album</Text>
@@ -40,15 +42,25 @@ export function TrackRow(props: {
    * repeat down the list. */
   secondary?: "artists" | "album";
   disabled?: boolean;
-  /** Comes in, in layers, after the rows before it. Read once, when the
-   * row is made: pass true only while the page is opening, so a row made
-   * again later (recycled, or redrawn) just shows. */
-  entrance?: boolean;
+  /** The list's wave: the row comes in with it each time the page is
+   * entered, and on its own when it is scrolled into view. */
+  wave?: ListWave;
   onPress: () => void;
 }) {
-  // The row fades in, its cover grows into place, then its words lift.
-  const delay = 120 + Math.min(props.number, 12) * 30;
-  const rise = untracked(() => !!props.entrance && !terminal && props.number < 14);
+  // The row slides in from the right and its cover flips open, once per
+  // track per entry. Made here, once, and bound as plain values: the Button
+  // re-reads its style whenever any of its props changes (`selected` follows
+  // every player update), and a motion made in that binding would play
+  // again each time.
+  const { style: entrance, cover: coverIn } = untracked(() =>
+    listItemEntrance({
+      wave: props.wave,
+      key: () => (props.track ? props.track.uid + props.track.uri : ""),
+      index: () => props.number,
+      axis: "translateX",
+      turns: WAVE.rows,
+    }),
+  );
   const current = () => isCurrentTrack(props.track?.uri ?? "");
   const playing = () => current() && player().playing;
   const label = () => (props.track ? `${props.track.name}, ${props.track.artists}` : "");
@@ -64,7 +76,7 @@ export function TrackRow(props: {
           : `group mx-3 h-12 flex-row items-center gap-3 rounded-(--radius) px-3 transition duration-150 ease-out hover:bg-row-hover active:bg-muted selected:bg-row-hover disabled:opacity-50 motion-reduce:transition-none ${focusRing}`
       }
       classList={{ "opacity-45": !!props.track && !props.track.playable }}
-      style={rise ? enter("fadeIn", delay) : undefined}
+      style={entrance}
     >
       <View class="w-6 items-end">
         <If
@@ -85,10 +97,10 @@ export function TrackRow(props: {
           <PlayingBars playing={playing()} />
         </If>
       </View>
-      <View style={rise ? enter("zoomIn", delay + 60) : undefined}>
+      <View style={coverIn}>
         <Cover src={props.track?.image ?? ""} size={36} fallback="music" class="rounded-sm" />
       </View>
-      <View class={terminal ? "min-w-0 flex-1 flex-row gap-2" : "min-w-0 flex-1 gap-0.5"} style={rise ? enter("fadeInUp", delay + 90) : undefined}>
+      <View class={terminal ? "min-w-0 flex-1 flex-row gap-2" : "min-w-0 flex-1 gap-0.5"}>
         <Text class={`line-clamp-1 text-sm text-foreground ${current() ? "font-semibold" : "font-medium"}`}>{props.track?.name ?? ""}</Text>
         <View class="flex-row items-center gap-1.5">
           <If when={!!props.track?.explicit && !terminal}>
@@ -97,14 +109,16 @@ export function TrackRow(props: {
             </Text>
           </If>
           <Text class="line-clamp-1 flex-1 text-xs text-muted-foreground">
-            {(props.secondary === "album" ? props.track?.album : props.track?.artists) ?? ""}
+            {/* Never an empty second line: the album where asked, else (or when
+                the album is unknown, as for an artist's top tracks) the artists. */}
+            {(props.secondary === "album" && props.track?.album ? props.track.album : props.track?.artists || props.track?.album) ?? ""}
           </Text>
         </View>
       </View>
       <If when={props.showAlbum}>
         <Text class="line-clamp-1 min-w-0 flex-1 text-xs text-muted-foreground">{props.track?.album ?? ""}</Text>
       </If>
-      <Text class="w-12 text-right text-xs tabular-nums text-muted-foreground">{props.track ? clock(props.track.durationMs) : ""}</Text>
+      <Digits class="w-12 text-right text-xs text-muted-foreground">{props.track ? clock(props.track.durationMs) : ""}</Digits>
     </Button>
   );
 }

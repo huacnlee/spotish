@@ -1,10 +1,12 @@
 // Feedback surfaces: the toasts, a page's error state, and the skeletons
 // that stand in for content while it loads.
 
-import { cleanup, createMotion, Overlay, safeArea, Text, View, windowSize } from "nsh";
+import { cleanup, createMotion, effect, Overlay, safeArea, signal, Text, untracked, View, windowSize } from "nsh";
+import type { JSX } from "nsh";
 import { Button, Toast, type ToastEntry, ToastStack } from "nsh/base";
 import { choose, dismiss, dismissNewest, setToastsExpanded, toastContent, toasts } from "../../state/feedback";
 import { ActionButton, focusRing, terminal } from "./controls";
+import { REVEAL_IN, REVEAL_OUT, SKELETON_PULSE } from "./motion";
 
 function ToastItem(props: { entry: ToastEntry }) {
   const content = () => toastContent(props.entry.id);
@@ -98,27 +100,180 @@ export function EmptyState(props: { title: string; detail?: string }) {
   );
 }
 
-/** A block standing in for content that loads. */
-/** A placeholder shape that breathes while content loads. */
+// ---- Skeletons and the reveal ----
+//
+// Ported from transitions.dev's "Skeleton loader and reveal": while content
+// loads, a skeleton shaped like it pulses (each shape dims to half and back,
+// once a second); when the content arrives the skeleton fades out as the
+// content fades in over it, over the same 360ms, ease-in-out. The reference
+// also cross-blurs the two layers by 2px; NSH cannot transition a filter, so
+// here it is a cross-fade alone. Content already there when the page opens
+// (cached) shows at once: no skeleton, no reveal.
+
+/** A placeholder shape that pulses while content loads. The pulse is on the
+ * shapes, so the skeleton's own opacity is free for the reveal. */
 function Block(props: { class: string }) {
   if (terminal) return <View class={`bg-muted ${props.class}`} />;
   const motion = createMotion();
-  void motion.play("breathe", { duration: 1600, iterations: "infinite" });
+  void motion.play(SKELETON_PULSE);
   cleanup(() => motion.stop());
-  return <View class={`rounded-(--radius) bg-muted ${props.class}`} style={motion.style} />;
+  return <View class={`rounded-sm bg-muted ${props.class}`} style={motion.style} />;
 }
 
-/** Rows of cards loading. */
+/** Content that loads: `placeholder` (a skeleton, or an error) while there is
+ * no `data`, then the reveal. `children` gets the data and whether it was
+ * there at once (`instant`: nothing was revealed, so a list's rows start
+ * their wave at once; after a reveal, as the skeleton fades: `AFTER_REVEAL`). `class` sizes both layers (`flex-1` around a `List`). */
+export function Reveal<T>(props: {
+  data: T | undefined | null;
+  placeholder: JSX.Element;
+  class?: string;
+  children: (data: () => T, instant: boolean) => JSX.Element;
+}) {
+  const instant = untracked(() => props.data != null);
+  if (terminal) {
+    return (
+      <If when={props.data} else={props.placeholder}>
+        {(data) => props.children(data as () => T, instant)}
+      </If>
+    );
+  }
+  // Whether the placeholder has finished leaving.
+  const gone = signal(instant);
+  effect(() => {
+    if (props.data == null) gone.set(false);
+  });
+  return (
+    <View class={`relative ${props.class ?? ""}`}>
+      <If when={props.data}>
+        {(data) => (
+          <Revealed instant={instant} class={props.class}>
+            {props.children(data as () => T, instant)}
+          </Revealed>
+        )}
+      </If>
+      <If when={!gone()}>
+        <Leaving leaving={props.data != null} onGone={() => gone.set(true)}>
+          {props.placeholder}
+        </Leaving>
+      </If>
+    </View>
+  );
+}
+
+/** The content's layer: fades in unless it was there at once. */
+function Revealed(props: { instant: boolean; class?: string; children: JSX.Element }) {
+  const style = untracked(() => (props.instant ? undefined : createMotion({ enter: REVEAL_IN }).style));
+  return (
+    <View class={props.class ?? ""} style={style}>
+      {props.children}
+    </View>
+  );
+}
+
+/** The placeholder's layer: in the flow while it stands in, then over the
+ * content, fading out, until it is gone. */
+function Leaving(props: { leaving: boolean; onGone: () => void; children: JSX.Element }) {
+  const motion = createMotion();
+  effect(() => {
+    if (!props.leaving) return;
+    untracked(() => void motion.play(REVEAL_OUT).then(() => props.onGone()));
+  });
+  cleanup(() => motion.stop());
+  return (
+    <View class={props.leaving ? "pointer-events-none absolute inset-x-0 top-0" : ""} style={motion.style}>
+      {props.children}
+    </View>
+  );
+}
+
+/** One track row loading, shaped like `TrackRow`: number, cover, title and
+ * second line, length. */
+function TrackRowBones(props: { index: number }) {
+  // Lines of a few lengths, so the column does not read as a grid.
+  const title = ["w-2/5", "w-1/2", "w-1/3", "w-3/5"][props.index % 4];
+  const second = ["w-1/4", "w-1/5", "w-1/3", "w-1/4"][props.index % 4];
+  return (
+    <View class={terminal ? "h-1" : "mx-3 h-12 flex-row items-center gap-3 px-3"}>
+      <View class="w-6 items-end">
+        <Block class="h-3 w-3" />
+      </View>
+      <Block class="size-9" />
+      <View class="min-w-0 flex-1 gap-1.5">
+        <Block class={`h-3 ${title}`} />
+        <Block class={`h-2.5 ${second}`} />
+      </View>
+      <View class="w-12 items-end">
+        <Block class="h-3 w-8" />
+      </View>
+    </View>
+  );
+}
+
+/** Track rows loading, as a track list lays them out (a page's list, or the
+ * songs of a search). */
+export function RowsSkeleton(props: { rows?: number; header?: boolean }) {
+  const rows = Array.from({ length: props.rows ?? 8 }, (_, i) => i);
+  return (
+    <View accessibilityLabel="Loading" testID="skeleton">
+      <If when={props.header && !terminal}>
+        {/* Where the list's header row goes. */}
+        <View class="mx-3 mb-1 h-8 border-b border-border/60" />
+      </If>
+      <Each of={rows}>{(i) => <TrackRowBones index={i()} />}</Each>
+    </View>
+  );
+}
+
+/** A collection's page loading: its header (cover, kind, name, details,
+ * play button) over track rows. */
+export function CollectionSkeleton(props: { phone: boolean }) {
+  return (
+    <View accessibilityLabel="Loading" testID="skeleton">
+      <View
+        class={
+          terminal
+            ? "gap-1"
+            : props.phone
+              ? "items-center gap-3 px-6 pb-4 pt-1"
+              : "flex-row items-end gap-4 px-6 pb-4 pt-1"
+        }
+      >
+        <Block class={props.phone ? "size-40 rounded-(--radius)" : "size-24 rounded-(--radius)"} />
+        <View class={props.phone ? "w-full items-center gap-2" : "min-w-0 flex-1 gap-2 pb-1"}>
+          <Block class="h-2.5 w-14" />
+          <Block class={props.phone ? "h-6 w-48" : "h-7 w-72 max-w-full"} />
+          <Block class="h-3 w-40" />
+        </View>
+        <Block class="size-11 shrink-0 rounded-full" />
+      </View>
+      <RowsSkeleton header />
+    </View>
+  );
+}
+
+/** Rows of cards loading, shaped like `CardRow`: a title over cards (cover,
+ * name, what it is). */
 export function CardsSkeleton(props: { rows?: number }) {
   const rows = Array.from({ length: props.rows ?? 2 }, (_, i) => i);
   return (
-    <View accessibilityLabel="Loading" class="gap-8 px-3" testID="skeleton">
+    <View accessibilityLabel="Loading" class={terminal ? "gap-1" : "gap-8"} testID="skeleton">
       <Each of={rows}>
         {() => (
-          <View class="gap-3">
+          <View class="gap-2">
             <Block class="mx-3 h-6 w-48" />
-            <View class="flex-row gap-3 overflow-hidden px-3">
-              <Each of={[0, 1, 2, 3, 4]}>{() => <Block class="size-32 shrink-0" />}</Each>
+            <View class="h-[216px] flex-row overflow-hidden pt-1">
+              <Each of={[0, 1, 2, 3, 4, 5, 6, 7]}>
+                {() => (
+                  <View class="w-36 shrink-0 gap-2 p-2.5">
+                    <Block class="aspect-square w-full rounded-(--radius)" />
+                    <View class="gap-1.5">
+                      <Block class="h-3 w-4/5" />
+                      <Block class="h-2.5 w-1/2" />
+                    </View>
+                  </View>
+                )}
+              </Each>
             </View>
           </View>
         )}
@@ -127,22 +282,39 @@ export function CardsSkeleton(props: { rows?: number }) {
   );
 }
 
-/** Track rows loading. */
-export function RowsSkeleton(props: { rows?: number }) {
-  const rows = Array.from({ length: props.rows ?? 8 }, (_, i) => i);
+/** The library loading, shaped like its rows: a round cover and a name (the
+ * rail: covers alone). */
+export function LibrarySkeleton(props: { compact: boolean; rows?: number }) {
+  const rows = Array.from({ length: props.rows ?? 6 }, (_, i) => i);
   return (
-    <View accessibilityLabel="Loading" class="gap-2 px-6" testID="skeleton">
+    <View accessibilityLabel="Loading" class={terminal ? "" : "px-2 pt-2"} testID="skeleton">
       <Each of={rows}>
-        {() => (
-          <View class="h-14 flex-row items-center gap-4">
-            <Block class="size-10" />
-            <View class="flex-1 gap-2">
-              <Block class="h-3 w-1/2" />
-              <Block class="h-3 w-1/3" />
+        {(i) => (
+          <View class="pb-1">
+            <View class={`h-11 flex-row items-center gap-3 px-2 ${props.compact ? "justify-center" : ""}`}>
+              <Block class={`${props.compact ? "size-9" : "size-[30px]"} rounded-full`} />
+              <If when={!props.compact}>
+                <Block class={`h-3 ${["w-3/5", "w-2/5", "w-1/2"][i() % 3]}`} />
+              </If>
             </View>
           </View>
         )}
       </Each>
+    </View>
+  );
+}
+
+/** Search results loading: songs, then a row of cards. */
+export function SearchSkeleton() {
+  return (
+    <View accessibilityLabel="Loading" class={terminal ? "gap-1" : "gap-8"} testID="skeleton">
+      <View class="gap-2">
+        <Block class="mx-6 h-6 w-24" />
+        <RowsSkeleton rows={4} header />
+      </View>
+      <View class="px-3">
+        <CardsSkeleton rows={1} />
+      </View>
     </View>
   );
 }

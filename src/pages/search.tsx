@@ -1,7 +1,7 @@
 // Search: a field, then songs, artists, albums and playlists. A new search
 // keeps the results that show, with a spinner, until its own arrive.
 
-import { resource, Scroll, signal, token, View } from "nsh";
+import { effect, resource, Scroll, token, untracked, View } from "nsh";
 import { Input } from "nsh/base";
 import type { SearchResults } from "../backend/types";
 import { AppPage } from "../components/page";
@@ -9,14 +9,16 @@ import { pageEnd, wideTracks } from "../components/layout";
 import { CardRow } from "../components/library/cards";
 import { TrackHeader, TrackRow } from "../components/library/tracks";
 import { SectionTitle, terminal } from "../components/ui/controls";
-import { EmptyState, ErrorState, Spinner } from "../components/ui/feedback";
+import { EmptyState, ErrorState, Reveal, SearchSkeleton, Spinner } from "../components/ui/feedback";
+import { createListWave } from "../components/ui/motion";
+import { currentRoute } from "../nav";
 import { Icon } from "../components/ui/icons";
 import { backend } from "../state/engine";
 import { playTrack } from "../state/player";
 import { dataEpoch, ready } from "../state/session";
 
-/** What was typed: kept while the page comes and goes. */
-const query = signal("");
+import { query } from "../state/search";
+import { layout } from "../components/layout";
 
 /** Milliseconds of quiet typing before a search runs. */
 const DEBOUNCE = 280;
@@ -40,6 +42,9 @@ export function SearchPage() {
 
   return (
     <AppPage title="Search" testID="page-search">
+      {/* On the desktop the field is in the header's top-right corner
+          (`SearchField`); the phone and the terminal keep it here. */}
+      <If when={layout() !== "desktop" || terminal}>
       <View class={terminal ? "flex-row items-center gap-1" : "flex-row items-center gap-3 px-6 pb-4"}>
         <View
           class={
@@ -66,17 +71,30 @@ export function SearchPage() {
           <Spinner label="Searching" />
         </If>
       </View>
+      </If>
       <Scroll class="flex-1" contentClass={pageEnd()}>
         <If when={term()} else={<EmptyState title="Search Spotify" detail="Find songs, artists, albums and playlists." />}>
-          <If
-            when={shown()}
-            else={
-              <If when={results.state() === "errored"}>
+          {/* Results come in with the skeleton's reveal when nothing showed
+              before them, their songs in a wave; a new search then keeps
+              them, with the spinner, and its own just take their place. */}
+          <Reveal
+            data={shown()}
+            placeholder={
+              <If when={results.state() === "errored"} else={<SearchSkeleton />}>
                 <ErrorState message="Search didn't work." onRetry={results.refetch} />
               </If>
             }
           >
-            {(found) => (
+            {(found, instant) => {
+              // Songs and cards wave in each time Search is entered, and each
+              // new search's own results wave in as they take the old ones'
+              // place; items scrolled to come in on their own.
+              const wave = createListWave({ isTop: () => currentRoute().name === "search", afterReveal: !instant });
+              effect(() => {
+                found();
+                untracked(() => wave.restart());
+              });
+              return (
               <If when={!isEmpty(found())} else={<EmptyState title="No results" detail="Check the spelling, or try fewer words." />}>
                 <View class={terminal ? "gap-1" : "gap-8"}>
                   <If when={found().tracks.length > 0}>
@@ -90,6 +108,7 @@ export function SearchPage() {
                             number={i()}
                             showAlbum={wideTracks()}
                             disabled={!ready()}
+                            wave={wave}
                             onPress={() => playTrack(track())}
                           />
                         )}
@@ -97,18 +116,19 @@ export function SearchPage() {
                     </View>
                   </If>
                   <If when={found().artists.length > 0}>
-                    <CardRow title="Artists" items={found().artists} class="px-3" />
+                    <CardRow title="Artists" items={found().artists} wave={wave} class="px-3" />
                   </If>
                   <If when={found().albums.length > 0}>
-                    <CardRow title="Albums" items={found().albums} class="px-3" />
+                    <CardRow title="Albums" items={found().albums} wave={wave} delay={120} class="px-3" />
                   </If>
                   <If when={found().playlists.length > 0}>
-                    <CardRow title="Playlists" items={found().playlists} class="px-3" />
+                    <CardRow title="Playlists" items={found().playlists} wave={wave} delay={240} class="px-3" />
                   </If>
                 </View>
               </If>
-            )}
-          </If>
+              );
+            }}
+          </Reveal>
         </If>
       </Scroll>
     </AppPage>

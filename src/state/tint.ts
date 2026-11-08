@@ -57,6 +57,15 @@ export function vivid(hex: string): string | null {
   return fromHsl(h, Math.max(0.6, Math.min(0.85, s)), 0.58);
 }
 
+/** `hex` lighter (`dl` > 0) or darker (`dl` < 0) by `dl` of lightness; a
+ * colour it can't read comes back as it is. */
+export function shade(hex: string, dl: number): string {
+  const rgba = parseColor(hex);
+  if (!rgba) return hex;
+  const [h, s, l] = hsl([rgba[0], rgba[1], rgba[2]]);
+  return fromHsl(h, s, Math.max(0, Math.min(1, l + dl)));
+}
+
 /** The controls' colour now (tracked). */
 export function tint(): string {
   cover();

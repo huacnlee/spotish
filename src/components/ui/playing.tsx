@@ -3,8 +3,8 @@
 // rhythm otherwise) and rest, short, while it is paused or with reduced
 // motion. Drawn by a shader, so it moves natively. In a terminal: a ♪.
 
-import { reduceMotion, Shader, Text, token, View } from "nsh";
-import { audioLevels } from "../../platform/audio";
+import { computed, effect, reduceMotion, Shader, Text, token, View } from "nsh";
+import { audioLevels, liveValues } from "../../platform/audio";
 import { terminal } from "./controls";
 
 const SOURCE = /* wgsl */ `
@@ -28,20 +28,24 @@ fn idle(i: f32, t: f32) -> f32 {
 fn shade(uv: vec2f) -> vec4f {
   let w = nsh.size.x;
   let h = nsh.size.y;
-  let gap = w * 0.14;
-  let bw = (w - gap * 2.0) / 3.0;
+  // Slim bars (a sixth of the mark each), spaced a little wider, centred.
+  let bw = w * 0.16;
+  let gap = w * 0.2;
+  let left = (w - bw * 3.0 - gap * 2.0) * 0.5;
   let p = uv * nsh.size;
-  let i = clamp(floor(p.x / (bw + gap)), 0.0, 2.0);
-  let x0 = i * (bw + gap);
+  let i = clamp(floor((p.x - left + gap * 0.5) / (bw + gap)), 0.0, 2.0);
+  let x0 = left + i * (bw + gap);
   var rest = array<f32, 3>(0.4, 0.7, 0.5);
   let idx = i32(i);
   var level = rest[idx];
   if (uniforms.playing > 0.5) {
     let metered = select(select(uniforms.levels.z, uniforms.levels.y, idx == 1), uniforms.levels.x, idx == 0);
     let own = idle(i, nsh.time);
-    level = mix(own, 0.25 + 0.75 * metered, uniforms.live);
+    // Each bar keeps its own base (never all one height, even as the
+    // music starts), the music adding to it; never past 80% of the mark.
+    level = mix(own * 0.8, rest[idx] * 0.6 + 0.5 * metered, uniforms.live);
   }
-  let bh = max(bw, h * clamp(level, 0.15, 1.0));
+  let bh = max(bw, h * clamp(level, 0.15, 0.8));
   // A rounded bar standing on the bottom.
   let r = bw * 0.5;
   let cx = x0 + r;
@@ -58,7 +62,19 @@ export function PlayingBars(props: { playing: boolean; size?: number }) {
   const height = () => props.size ?? 14;
   if (terminal) return <Text class="text-foreground">♪</Text>;
   const audio = audioLevels();
-  const live = () => (audio().level > 0.02 ? 1 : 0);
+  // Changes only when the music starts or stops being metered.
+  const live = computed(() => (audio().level > 0.02 ? 1 : 0));
+  // The levels reach the shader as animated values: its layer is not sent
+  // anew with each of the music's frames, which would take what is behind
+  // the player's glass again each time (the mark draws before it).
+  const levels = liveValues(3);
+  effect(() => {
+    const a = audio();
+    const on = props.playing;
+    levels.set(0, on ? a.bass : 0);
+    levels.set(1, on ? a.mid : 0);
+    levels.set(2, on ? a.treble : 0);
+  });
   return (
     <View accessibilityLabel={props.playing ? "Playing" : "Paused"} style={{ width: height(), height: height() }}>
       <Shader
@@ -71,7 +87,7 @@ export function PlayingBars(props: { playing: boolean; size?: number }) {
         class="absolute inset-0"
         uniforms={{
           color: String(token("foreground")),
-          levels: props.playing ? [audio().bass, audio().mid, audio().treble, 0] : [0, 0, 0, 0],
+          levels: [levels.values[0], levels.values[1], levels.values[2], 0],
           live: props.playing ? live() : 0,
           playing: props.playing && !reduceMotion() ? 1 : 0,
           pad0: 0,

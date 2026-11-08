@@ -9,6 +9,8 @@ import { ready } from "../../state/session";
 import { Cover, focusRing, PlayButton } from "../ui/controls";
 import { coverColorsQuery } from "../../data/queries";
 import { setCoverTint } from "../../state/tint";
+import { lightEffect } from "../../state/visual";
+import { LightMenu } from "./light-menu";
 import { PlayerGlass } from "../ui/toolbar-fx";
 import { enter } from "../ui/motion";
 import { LikeButton, NowPlayingSummary, SeekBar, TransportControls, VolumeControl } from "./parts";
@@ -26,22 +28,27 @@ export function PlayerBar() {
     <View style={enter("fadeInUp", 120)}>
     <View class="rounded-full shadow-xl">
     <PlayerGlass
-      effect="spectrum"
+      effect={lightEffect()}
       colors={colors()}
       playing={player().playing}
       testID="player"
-      class="h-18 flex-row items-center justify-between gap-4 rounded-full pl-2 pr-5"
+      class="h-18 flex-row items-center justify-between gap-4 rounded-full pl-3.5 pr-5"
     >
       <View class="w-1/4 min-w-0 flex-row items-center gap-2">
-        <NowPlayingSummary openable round cover={54} />
+        {/* A smaller round cover, concentric with the pill: 14pt from its
+            edge on every side (72 = 44 + 2 × 14). */}
+        <NowPlayingSummary openable round cover={44} />
         <LikeButton />
       </View>
       <View class="max-w-180 flex-1 items-center gap-1">
-        <TransportControls />
-        <SeekBar inline />
+        <TransportControls quiet />
+        <SeekBar inline quiet />
       </View>
       <View class="w-1/4 flex-row items-center justify-end gap-1 pr-2">
-        <VolumeControl collapsible />
+        <LightMenu placement="top" />
+        {/* The volume always shows its slider here, balancing what plays on
+            the left. */}
+        <VolumeControl quiet />
       </View>
     </PlayerGlass>
     </View>

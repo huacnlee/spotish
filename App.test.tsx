@@ -52,9 +52,12 @@ test("Back, Forward and the library move through the stack", async () => {
   await app.waitFor("For the last ride home.");
   expect(app.enabled("role:button[Go forward]")).toBe(false);
 
-  // A root (Search) replaces the stack, and clears Forward.
+  // A root (Search) replaces the stack, and clears Forward. On a desktop
+  // the header's Search opens a field; the return key opens the page.
   await app.press("role:button[Search]");
-  await app.waitFor("label:Search Spotify");
+  await app.type("label:Search Spotify", "kites");
+  await app.submit("label:Search Spotify");
+  await app.waitFor("role:button[Kites, The Quiet Fields]");
   expect(app.enabled("role:button[Go back]")).toBe(false);
   expect(app.enabled("role:button[Go forward]")).toBe(false);
 });
@@ -83,7 +86,10 @@ test("a free account hears that it shuffles, once a session", async () => {
   await app.waitFor("Good evening, Ada");
   await app.press("role:button[Morning Static]");
   await app.waitFor("role:button[First Light, The Quiet Fields]");
-  await app.press("role:button[First Light, The Quiet Fields]");
+  // The demo's free tier starts Morning Static at First Light: pick another
+  // song, so what plays is not what was picked, and the notice explains.
+  await app.waitFor("role:button[Slow River, The Quiet Fields]");
+  await app.press("role:button[Slow River, The Quiet Fields]");
   const notice = "Spotify Free shuffles playlists. Premium lets you pick any song.";
   await app.waitFor(notice);
   expect(app.texts()).toContain("Explore Premium");
@@ -141,6 +147,7 @@ test("space plays and pauses, but types in the search field", async () => {
   await app.type("label:Search Spotify", "glass bees");
   expect(app.value("label:Search Spotify")).toBe("glass bees");
   expect(app.shows("id:player >> role:button[Pause]")).toBe(true);
+  await app.submit("label:Search Spotify");
   await app.waitFor("role:button[Glass Bees, Mira Vale]");
 });
 

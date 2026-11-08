@@ -3,7 +3,7 @@
 // Each opened collection is a page of its own in the stack, with its own
 // list and scroll position.
 
-import { List, Text, View } from "nsh";
+import { effect, List, Text, untracked, View } from "nsh";
 import type { Collection } from "../backend/types";
 import { AppPage } from "../components/page";
 import { layout, pageEnd, wideTracks } from "../components/layout";
@@ -15,14 +15,16 @@ import {
   SectionTitle,
   terminal,
 } from "../components/ui/controls";
-import { enter } from "../components/ui/motion";
+import { AFTER_REVEAL, createListWave, enter } from "../components/ui/motion";
+import { currentRoute } from "../nav";
 import {
   EmptyState,
   ErrorState,
-  RowsSkeleton,
+  CollectionSkeleton,
+  Reveal,
 } from "../components/ui/feedback";
 import { collectionQuery } from "../data/queries";
-import { isPlayingContext, playFrom, toggleCollection } from "../state/player";
+import { isPlayingContext, playFrom, rememberTracks, toggleCollection } from "../state/player";
 import { ready } from "../state/session";
 
 const KIND_LABEL: Record<string, string> = {
@@ -32,7 +34,19 @@ const KIND_LABEL: Record<string, string> = {
   playlist: "Playlist",
 };
 
-function Header(props: { uri: string; data: Collection }) {
+function Header(props: { uri: string; data: Collection; entrance: boolean }) {
+  // Its layers come in one after another: at once when the page shows
+  // straight away (cached), else as the skeleton gives way. Made once.
+  const start = untracked(() => (props.entrance ? 0 : AFTER_REVEAL));
+  const intro = (preset: "zoomIn" | "fadeInUp", delay = 0) =>
+    untracked(() => (terminal ? undefined : enter(preset, start + delay)));
+  const coverIn = intro("zoomIn");
+  // The words, each line on its own beat: the kind, then the name, then the
+  // quieter lines under it.
+  const kindIn = intro("fadeInUp", 70);
+  const nameIn = intro("fadeInUp", 150);
+  const restIn = intro("fadeInUp", 250);
+  const playIn = intro("zoomIn", 330);
   const header = () => props.data.header;
   const phone = () => layout() !== "desktop";
   const play = (size: number) => (
@@ -50,10 +64,13 @@ function Header(props: { uri: string; data: Collection }) {
           ? "gap-1"
           : phone()
             ? "items-center gap-3 px-6 pb-4 pt-1"
-            : "flex-row items-end gap-4 px-6 pb-4 pt-1"
+            : // Desktop: the header's picture (96pt) is centred over the rows'
+              // covers: a row puts its cover's centre 78pt in (12 + 12 inset,
+              // 24 number, 12 gap, half of 36), so the header starts 30pt in.
+              "flex-row items-end gap-4 pl-[30px] pr-6 pb-4 pt-1"
       }
     >
-      <View style={terminal ? undefined : enter("zoomIn")} class={phone() ? "w-full max-w-40" : ""}>
+      <View style={coverIn} class={phone() ? "w-full max-w-40" : ""}>
         <Cover
           src={header().image}
           round={header().kind === "artist"}
@@ -61,31 +78,50 @@ function Header(props: { uri: string; data: Collection }) {
           class={phone() ? "w-full shadow-xl" : "w-24 shadow-xl"}
         />
       </View>
-      <View class="min-w-0 flex-1 gap-1 self-stretch justify-end" style={terminal ? undefined : enter("fadeInUp", 80)}>
-        <Text class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {KIND_LABEL[header().kind] ?? "Playlist"}
-        </Text>
-        <Text role="header" class={`line-clamp-1 font-extrabold text-foreground ${phone() ? "text-2xl" : "text-3xl"}`}>
-          {header().name}
-        </Text>
-        <If when={header().description}>
-          <Text class="line-clamp-1 text-sm text-muted-foreground">{header().description}</Text>
-        </If>
-        <Text class="text-sm font-semibold text-foreground">{header().subtitle}</Text>
+      {/* The words as one block centred on the picture: kind, name, and a
+          quiet third line (secondary: small and muted). */}
+      <View class="min-w-0 flex-1 gap-1 self-stretch justify-center" selectable={!terminal}>
+        <View style={kindIn}>
+          <Text class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {KIND_LABEL[header().kind] ?? "Playlist"}
+          </Text>
+        </View>
+        <View style={nameIn}>
+          <Text role="header" class={`line-clamp-1 font-extrabold text-foreground ${phone() ? "text-2xl" : "text-3xl"}`}>
+            {header().name}
+          </Text>
+        </View>
+        <View class="gap-1" style={restIn}>
+          <If when={header().description}>
+            <Text class="line-clamp-1 text-sm text-muted-foreground">{header().description}</Text>
+          </If>
+          <Text class="text-xs text-muted-foreground">{header().subtitle}</Text>
+        </View>
       </View>
-      <View class="shrink-0" style={terminal ? undefined : enter("zoomIn", 160)}>
+      <View class="shrink-0" style={playIn}>
         {play(phone() ? 48 : 44)}
       </View>
     </View>
   );
 }
 
-function Tracks(props: { uri: string; data: Collection }) {
+function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
+  // What plays is found among these when the player can't name it.
+  effect(() => rememberTracks(props.uri, props.data.tracks));
   const artist = () => props.data.header.kind === "artist";
   const showAlbum = () => wideTracks() && !artist();
-  // The rows come in while the page opens; any made after that just show.
-  const opened = Date.now();
-  const opening = () => Date.now() - opened < 900;
+  // The rows wave in, top to bottom, every time this page is entered
+  // (opened, or gone back to): at once when cached, as the skeleton fades
+  // when they loaded. Rows scrolled to come in on their own.
+  const wave = untracked(() =>
+    createListWave({
+      isTop: () => {
+        const route = currentRoute();
+        return route.name === "collection" && route.uri === props.uri;
+      },
+      afterReveal: !props.instant,
+    }),
+  );
   return (
     <List
       each={props.data.tracks}
@@ -93,10 +129,7 @@ function Tracks(props: { uri: string; data: Collection }) {
       estimatedItemSize={48}
       header={() => (
         <View>
-          <Header uri={props.uri} data={props.data} />
-          <If when={artist()}>
-            <SectionTitle class="px-6 pb-2">Popular</SectionTitle>
-          </If>
+          <Header uri={props.uri} data={props.data} entrance={props.instant} />
           <TrackHeader showAlbum={showAlbum()} />
         </View>
       )}
@@ -105,7 +138,7 @@ function Tracks(props: { uri: string; data: Collection }) {
           <If when={props.data.releases.length > 0}>
             <View class="gap-2 px-3 pt-8">
               <SectionTitle class="px-3">Discography</SectionTitle>
-              <CardGrid items={props.data.releases} />
+              <CardGrid items={props.data.releases} wave={wave} />
             </View>
           </If>
         </View>
@@ -120,10 +153,10 @@ function Tracks(props: { uri: string; data: Collection }) {
           showAlbum={showAlbum()}
           secondary={artist() ? "album" : "artists"}
           disabled={!ready()}
-          entrance={opening()}
+          wave={wave}
           onPress={() => {
             const track = row();
-            if (track) playFrom(props.uri, track.uri);
+            if (track) playFrom(props.uri, track.uri, track);
           }}
         />
       )}
@@ -136,19 +169,20 @@ export function CollectionPage(props: { uri: string }) {
   const title = () => query.data()?.header.name ?? "";
   const liked = () => query.data()?.header.kind === "collection";
   const body = () => (
-    <If
-      when={query.data()}
-      else={
-        <If when={query.error()} else={<RowsSkeleton />}>
+    <Reveal
+      data={query.data()}
+      placeholder={
+        <If when={query.error()} else={<CollectionSkeleton phone={layout() !== "desktop"} />}>
           <ErrorState
             message="This page didn't load."
             onRetry={query.refetch}
           />
         </If>
       }
+      class="flex-1"
     >
-      {(data) => <Tracks uri={props.uri} data={data()} />}
-    </If>
+      {(data, instant) => <Tracks uri={props.uri} data={data()} instant={instant} />}
+    </Reveal>
   );
   return (
     <AppPage
