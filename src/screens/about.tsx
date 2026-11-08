@@ -6,6 +6,7 @@ import { Button } from "nsh/base";
 import { store } from "../ui/store";
 import { PillButton } from "../ui/controls";
 import { Icon } from "../ui/icons";
+import { Logo } from "../ui/logo";
 
 const REPO = "https://github.com/huacnlee/spotish";
 const NSH = "https://nsh.dev";
@@ -24,7 +25,7 @@ function LinkRow(props: { label: string; url: string }) {
   return (
     <Button
       onPress={() => store.openExternal(props.url)}
-      class="h-11 flex-row items-center justify-between rounded-(--radius) bg-secondary px-4 hover:bg-row-hover active:opacity-70 focus:outline focus:outline-2 focus:outline-ring"
+      class="h-11 flex-row items-center justify-between rounded-(--radius) border border-border bg-card px-4 hover:bg-row-hover active:opacity-70 focus:outline focus:outline-2 focus:outline-ring"
     >
       <Text class="text-sm font-medium text-foreground">{props.label}</Text>
       <View class="text-muted-foreground"><Icon name="chevronRight" size={16} color="muted-foreground" /></View>
@@ -36,21 +37,23 @@ export function About() {
   return (
     <If when={store.about()}>
       <View class="absolute inset-0 items-center justify-center bg-shell/85 p-4" onPress={() => store.about.set(false)}>
-        <View class="w-[440px] max-w-[440px] overflow-hidden rounded-(--radius-panel) bg-popover shadow-2xl" onPress={() => {}}>
+        <View class="relative w-[440px] max-w-[440px] overflow-hidden rounded-(--radius-panel) bg-popover shadow-2xl" onPress={() => {}}>
+          <Button
+            accessibilityLabel="Close"
+            onPress={() => store.about.set(false)}
+            class="absolute right-3 top-3 z-10 size-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:bg-row-hover hover:text-foreground active:opacity-60"
+          >
+            <Icon name="close" size={18} color="muted-foreground" />
+          </Button>
           <Scroll class="max-h-[80vh]">
             <View class="gap-5 p-6">
               {/* Header */}
-              <View class="flex-row items-center justify-between">
-                <View class="flex-row items-center gap-3">
-                  <View class="text-primary"><Icon name="music" size={26} color="primary" /></View>
-                  <View>
-                    <Text class="text-xl font-extrabold text-foreground">Spotish</Text>
-                    <Text class="text-xs text-muted-foreground">A native player for Spotify</Text>
-                  </View>
+              <View class="flex-row items-center gap-3 pr-10">
+                <Logo size={36} />
+                <View>
+                  <Text class="text-xl font-extrabold text-foreground">Spotish</Text>
+                  <Text class="text-xs text-muted-foreground">A native player for Spotify</Text>
                 </View>
-                <Button accessibilityLabel="Close" onPress={() => store.about.set(false)} class="size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-row-hover active:opacity-60">
-                  <Icon name="close" size={18} color="muted-foreground" />
-                </Button>
               </View>
 
               {/* Spotify disclaimer, first */}
@@ -68,7 +71,7 @@ export function About() {
               </View>
 
               {/* Premium */}
-              <View class="gap-2 rounded-(--radius-card) bg-secondary p-4">
+              <View class="gap-2 rounded-(--radius-card) border border-border bg-card p-4">
                 <Text class="text-sm font-semibold text-foreground">Keeping the ads? Spotify Premium removes them.</Text>
                 <Text class="text-sm leading-[21px] text-muted-foreground">
                   Spotish never blocks Spotify's ads. Premium removes them, plays any track on demand, and supports artists.

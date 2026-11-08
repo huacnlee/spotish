@@ -13,17 +13,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// Where the app keeps the browser's profile (and with it the sign-in).
-///
-/// `SPOTISH_PROFILE` overrides it with an existing browser profile to reuse,
-/// so a listener already signed in there needs no second sign-in. That
-/// browser must be closed while Spotish runs (Chromium allows one instance
-/// per profile). Spotish only reads the profile as that browser would; it
-/// never decrypts cookies out of it.
+/// Where the app keeps the browser's profile (and with it the sign-in). Always
+/// Spotish's own directory; a login reused from another browser is copied into
+/// it by [`import_session`].
 pub fn profile_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("SPOTISH_PROFILE").filter(|p| !p.is_empty()) {
-        return PathBuf::from(path);
-    }
     let base = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .filter(|p| p.is_absolute())
@@ -32,11 +25,58 @@ pub fn profile_dir() -> PathBuf {
     base.join("spotish").join("browser")
 }
 
-/// Whether a chosen profile is already locked by a running browser.
-pub fn profile_locked(profile: &Path) -> bool {
-    // Chromium's `SingletonLock` is a symlink present while an instance holds
-    // the profile.
-    std::fs::symlink_metadata(profile.join("SingletonLock")).is_ok()
+/// Reuses an existing browser's login: when `SPOTISH_PROFILE` points at a
+/// browser profile and Spotish has no session of its own yet, copies that
+/// profile's cookies, its encryption key and the Widevine component into
+/// Spotish's profile — once. Spotish then runs on its own copy, so the other
+/// browser need not be closed, and Spotish never has to decrypt anything
+/// (Chromium reads the copied files itself, under the same system keyring).
+///
+/// This works only between the same browser family (the keyring entry must
+/// match); Spotish runs Chromium, so point it at a Chromium profile.
+pub fn import_session(target: &Path) {
+    let Some(source) = std::env::var_os("SPOTISH_PROFILE").filter(|p| !p.is_empty()).map(PathBuf::from) else {
+        return;
+    };
+    // Only import once: if Spotish already has cookies, keep its own session.
+    let target_default = target.join("Default");
+    if target_default.join("Cookies").exists() || target_default.join("Network").join("Cookies").exists() {
+        return;
+    }
+    if std::fs::create_dir_all(&target_default).is_err() {
+        return;
+    }
+    let source_default = source.join("Default");
+    let mut copied = false;
+    for cookies in ["Cookies", "Network/Cookies"] {
+        let from = source_default.join(cookies);
+        if from.exists() {
+            let to = target_default.join(cookies);
+            if let Some(parent) = to.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if std::fs::copy(&from, &to).is_ok() {
+                copied = true;
+            }
+        }
+    }
+    if !copied {
+        log::warn!("SPOTISH_PROFILE={}: no cookies found to reuse", source.display());
+        return;
+    }
+    // The encryption key lives in Local State; without it the cookies are
+    // undecryptable. The keyring entry is shared per browser family.
+    let _ = std::fs::copy(source.join("Local State"), target.join("Local State"));
+    if !has_widevine(target) {
+        let _ = copy_dir(&source.join("WidevineCdm"), &target.join("WidevineCdm"));
+        // Point the hint at the copied location.
+        let hint = target.join("WidevineCdm").join(HINT);
+        if let Ok(text) = std::fs::read_to_string(&hint) {
+            let fixed = text.replace(&source.to_string_lossy().to_string(), &target.to_string_lossy().to_string());
+            let _ = std::fs::write(&hint, fixed);
+        }
+    }
+    log::info!("reused the Spotify login from {}", source.display());
 }
 
 fn home() -> Option<PathBuf> {
