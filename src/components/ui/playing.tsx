@@ -66,8 +66,7 @@ export function PlayingBars(props: { playing: boolean; size?: number }) {
   // music's frames are not followed.
   const live = computed(() => (props.playing && audio().level > 0.02 ? 1 : 0));
   // The levels reach the shader as animated values: its layer is not sent
-  // anew with each of the music's frames, which would take what is behind
-  // the player's glass again each time (the mark draws before it).
+  // anew with each of the music's frames.
   const levels = liveValues(3);
   effect(() => {
     // Paused: at rest, and the music's frames not followed (not read).

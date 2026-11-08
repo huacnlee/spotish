@@ -1,6 +1,6 @@
 // The desktop's shell: the sidebar (a rail on narrow windows) down the left,
 // and the pages on the right with the player floating over their bottom, a
-// translucent pill the pages scroll behind.
+// pill the pages scroll behind.
 
 import { View } from "nsh";
 import { railSidebar } from "../components/layout";
@@ -20,8 +20,7 @@ export function DesktopShell() {
         </View>
         <View class="relative min-w-0 flex-1">
           <MainStack class="min-w-0 overflow-hidden" />
-          {/* Not drawn under Now Playing: its glass reads what is behind it
-              every frame, and there it would show nothing. */}
+          {/* Not drawn under Now Playing, which covers it. */}
           <If when={!nowPlayingOpen()}>
             <View class="absolute inset-x-3 bottom-1">
               <PlayerBar />

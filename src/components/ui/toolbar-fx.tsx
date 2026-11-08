@@ -1,11 +1,9 @@
-// The player's glass: Liquid Glass drawn by a shader for every system. It
-// reads what is behind it and bends it at the rim like a lens (splitting
-// its colours a little there), frosts it, darkens it toward the player's
-// colour so the controls stay legible, and catches light on its rim. Over
-// it, in a layer of its own, the music's light (an effect in the cover's
-// colours, src/platform/audio.ts); the controls are drawn on top as they
-// are. The glass's uniforms hold still, so it is drawn again only when what
-// is behind it changes: the music redraws only the cheap light.
+// The player's surface and the music's light. The surface is the player's
+// colour, opaque, with a one-pixel rim; it reads nothing behind it
+// (a glass that did cost a picture of the page under it on every frame of
+// a scroll, more than a 120 Hz frame has). Over it, in a layer of its own,
+// the music's light (an effect in the cover's colours,
+// src/platform/audio.ts); the controls are drawn on top as they are.
 //
 // Every effect is `fn glow(p: vec2f, uv: vec2f) -> vec4f`: the light's
 // colour (rgb, tamed after) and strength (a, 0..1) at `p` (points in the
@@ -13,7 +11,7 @@
 // systems, the demo) effects run at a resting level; paused, they hold
 // still; with reduced motion they rest. In a terminal: a plain box.
 
-import { Animated, type AnimatedValue, cleanup, createAnimatedValue, Easing, effect, type JSX, reduceMotion, Shader, ShaderEffect, token, View } from "nsh";
+import { Animated, type AnimatedValue, cleanup, createAnimatedValue, Easing, effect, type JSX, reduceMotion, Shader, token, View } from "nsh";
 import { audioLevels, liveValues } from "../../platform/audio";
 import { alpha } from "../../state/tint";
 import { terminal } from "./controls";
@@ -107,60 +105,6 @@ fn ends(uv: vec2f) -> f32 {
 }
 `;
 
-
-// The glass alone: what is behind, bent at the rim and frosted, darkened
-// toward the player's colour, a one-pixel rim catching the light. Its
-// uniforms hold still, so it draws again only when what is behind it
-// changes (a scroll), never with the music.
-const GLASS = /* wgsl */ `${HEAD}
-fn normal_at(p: vec2f) -> vec2f {
-  let e = 0.75;
-  let g = vec2f(pill(p + vec2f(e, 0.0)) - pill(p - vec2f(e, 0.0)), pill(p + vec2f(0.0, e)) - pill(p - vec2f(0.0, e)));
-  return g / max(length(g), 0.0001);
-}
-
-// What is behind, frosted: a small golden-angle disc of taps around p.
-fn frost(p: vec2f) -> vec3f {
-  var sum = vec3f(0.0);
-  for (var i = 0; i < 8; i = i + 1) {
-    let f = f32(i);
-    let r = sqrt((f + 0.5) / 8.0) * 5.0;
-    let a = f * 2.39996;
-    sum = sum + sample_backdrop((p + vec2f(cos(a), sin(a)) * r) / nsh.size).rgb;
-  }
-  return sum / 8.0;
-}
-
-fn shade(uv: vec2f) -> vec4f {
-  let p = uv * nsh.size;
-  let d = pill(p);
-  let cover = clamp(0.5 - d, 0.0, 1.0);
-  if (cover <= 0.0) {
-    return vec4f(0.0);
-  }
-  let depth = -d;
-  let bevel = min(nsh.size.y * 0.15, 7.0);
-  let rim = clamp(1.0 - depth / bevel, 0.0, 1.0);
-  let n = normal_at(p);
-
-  // The lens: toward the rim the backdrop is drawn in from beyond it, its
-  // colours split a little.
-  let at = p - n * pow(rim, 2.5) * 6.0;
-  let split = n * pow(rim, 3.0) * 0.8;
-  var col = vec3f(frost(at + split).r, frost(at).g, frost(at - split).b);
-
-  // The glass body: toward the player's colour, so the controls read.
-  col = mix(col, uniforms.base.rgb, uniforms.base.a);
-
-  // The rim: a one-pixel line, bright where it faces the light (above, a
-  // little left), fainter below.
-  let facing = dot(n, normalize(vec2f(-0.3, -1.0)));
-  let line = clamp(1.0 - depth * nsh.scale, 0.0, 1.0);
-  col = col + line * (0.06 + 0.30 * max(facing, 0.0) + 0.06 * max(-facing, 0.0));
-  let noise = (fract(52.9829189 * fract(dot(p * nsh.scale, vec2f(0.06711056, 0.00583715)))) - 0.5) / 255.0;
-  return vec4f(clamp(col + noise, vec3f(0.0), vec3f(1.0)), cover);
-}
-`;
 
 // Light rising from the bottom edge, the spectrum mirrored from the centre.
 const SPECTRUM = /* wgsl */ `
@@ -820,24 +764,10 @@ function lightUniforms(props: { effect: ToolbarEffect; colors: string[]; playing
   };
 }
 
-/** HEAD's uniforms held still, for the glass (it reads only `base` and
- * `radius`). */
-function stillUniforms(base: string, radius: number) {
-  const zero = [0, 0, 0, 0];
-  return {
-    c0: "#000000", c1: "#000000", c2: "#000000", c3: "#000000",
-    base,
-    b0: zero, b1: zero, b2: zero, b3: zero,
-    beat: 0, level: 0, bass: 0, mid: 0, treble: 0,
-    strength: 0, radius, reach: 0, phase: 0, clock: 0, pad1: 0, pad2: 0,
-  };
-}
-
-/** The player's glass behind `children`, filling its box (`class` gives
+/** The player's surface behind `children`, filling its box (`class` gives
  * size, padding and layout): a pill by default, or a box of corner
- * `radius` points. Three layers: the glass (redrawn only when what is
- * behind it changes), the music's light over it (cheap, with the music),
- * and the controls on top, drawn as they are. */
+ * `radius` points. Three layers: the surface, the music's light over it
+ * (cheap, with the music), and the controls on top, drawn as they are. */
 export function PlayerGlass(props: {
   effect: ToolbarEffect;
   /** The cover's colours, most telling first; an effect takes the first it
@@ -854,17 +784,14 @@ export function PlayerGlass(props: {
   const radius = () => props.radius ?? 9999;
   return (
     <View testID={props.testID} class={`relative ${props.class ?? ""}`}>
-      <ShaderEffect
-        source={GLASS}
+      {/* The surface: the player's colour, opaque, with a faint rim.
+          It reads nothing behind it, so a page scrolling under it costs no
+          picture of what it covers. */}
+      <View
         accessibilityElementsHidden
-        maxSampleOffset={12}
-        class="absolute inset-0"
-        // The player's colour over nearly all of what shows through: the
-        // pages behind only tint the glass, they don't move in it.
-        uniforms={stillUniforms(alpha(String(token("player")), 0.9), radius())}
-      >
-        <View class="flex-1" />
-      </ShaderEffect>
+        class="absolute inset-0 border border-white/10"
+        style={{ backgroundColor: alpha(String(token("player")), 1), borderRadius: radius() }}
+      />
       <Shader
         source={LIGHTS[props.effect]}
         accessibilityElementsHidden
