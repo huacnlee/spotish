@@ -16,6 +16,7 @@ import { Account } from "./library/sidebar";
 import { closeMainWindow, hasAppWindow } from "../platform/desktop";
 import { sidebarCollapsed, toggleSidebar } from "../state/sidebar";
 import { ActionButton, IconButton, terminal } from "./ui/controls";
+import { titleBarArea } from "./ui/title-bar";
 
 /** Log in while signed out; Premium for a free account; nothing
  * while the session is not known yet. */
@@ -73,7 +74,7 @@ function SearchBox(props: { onSearch: boolean; onDone: () => void }) {
   };
   return (
     <View
-      class="h-10 w-72 flex-row items-center gap-2 rounded-full border border-secondary bg-secondary px-3.5 transition duration-150 ease-out focus-within:border-foreground/40 motion-reduce:transition-none"
+      class="h-8 w-72 flex-row items-center gap-2 rounded-full border border-secondary bg-secondary px-3.5 transition duration-150 ease-out focus-within:border-foreground/40 motion-reduce:transition-none"
       style={grow}
     >
       <Icon name="search" size={16} color="muted-foreground" />
@@ -99,18 +100,18 @@ function SearchBox(props: { onSearch: boolean; onDone: () => void }) {
   );
 }
 
-/** The header of a page: Back (and Forward where there is room), the
- * page's title when `title` shows, and the account's action. */
-export function PageHeader(props: { title: string; showTitle?: boolean }) {
+/** Whether the window's title bar holds the header's controls: on the
+ * desktops where the app draws its own (macOS, Windows; tracked, it goes
+ * in full screen). Elsewhere (Linux keeps the system's, the web, full
+ * screen) each page's header has them. */
+export const controlsInTitleBar = () => layout() === "desktop" && titleBarArea().height > 0;
+
+/** Getting around: the account when the sidebar is folded away, the
+ * sidebar's toggle, Back and Forward. */
+export function NavControls() {
   const desktop = () => layout() === "desktop";
   return (
-    <View
-      class={
-        terminal
-          ? "flex-row items-center gap-1"
-          : "min-h-14 flex-row items-center gap-2 px-4 pt-[env(safe-area-inset-top)]"
-      }
-    >
+    <>
       {/* With the sidebar folded away, the account comes up here: the
           user's picture, which opens the user menu. */}
       <If when={desktop() && !terminal && !sidebarShown()}>
@@ -131,21 +132,65 @@ export function PageHeader(props: { title: string; showTitle?: boolean }) {
       <If when={desktop()}>
         <IconButton name="chevronRight" label="Go forward" short="Forward" disabled={!canForward()} onPress={forward} />
       </If>
-      <If when={props.showTitle ?? false}>
-        <Text role="header" class="line-clamp-1 flex-1 text-lg font-bold text-foreground">
-          {props.title}
-        </Text>
-      </If>
-      <View class="flex-1" />
+    </>
+  );
+}
+
+/** The trailing controls: search and the account's action. */
+export function TrailingControls() {
+  const desktop = () => layout() === "desktop";
+  return (
+    <>
       <If when={desktop() && !terminal}>
         <SearchField />
       </If>
       <AccountAction />
-      {/* Closes the main window, as the title bar's close would: it hides
-          while the tray keeps the app (the music plays on). */}
-      <If when={desktop() && !terminal && hasAppWindow}>
-        <IconButton name="close" label="Close window" hint onPress={closeMainWindow} />
-      </If>
-    </View>
+    </>
+  );
+}
+
+/** The header of a page: Back (and Forward where there is room), the
+ * page's title when `title` shows, and the account's action. Where the
+ * title bar holds the controls (`controlsInTitleBar`), only the title, or
+ * a little room above the page. */
+export function PageHeader(props: { title: string; showTitle?: boolean }) {
+  const desktop = () => layout() === "desktop";
+  return (
+    <If
+      when={!controlsInTitleBar()}
+      else={
+        <If when={props.showTitle ?? false} else={<View class="h-3" />}>
+          <View class="min-h-14 flex-row items-center px-4">
+            <Text role="header" class="line-clamp-1 flex-1 text-lg font-bold text-foreground">
+              {props.title}
+            </Text>
+          </View>
+        </If>
+      }
+    >
+      <View
+        class={
+          terminal
+            ? "flex-row items-center gap-1"
+            : "min-h-14 flex-row items-center gap-2 px-4 pt-[env(safe-area-inset-top)]"
+        }
+      >
+        <NavControls />
+        <If when={props.showTitle ?? false}>
+          <Text role="header" class="line-clamp-1 flex-1 text-lg font-bold text-foreground">
+            {props.title}
+          </Text>
+        </If>
+        <View class="flex-1" />
+        <TrailingControls />
+        {/* Closes the main window, as the title bar's close would: it hides
+            while the tray keeps the app (the music plays on). Only where
+            there is no title bar of the app's own (Linux keeps the
+            system's, which a tiling desktop does not draw). */}
+        <If when={desktop() && !terminal && hasAppWindow}>
+          <IconButton name="close" label="Close window" hint onPress={closeMainWindow} />
+        </If>
+      </View>
+    </If>
   );
 }
