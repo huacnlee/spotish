@@ -266,13 +266,11 @@ the code.
   pasted on: skip leaves an echo the way it goes, shuffle's lines cross,
   repeat's arrows turn once, the volume's waves come in one by one, the heart
   beats. Small and once per entry.
-- The logo is a pair of beamed sixteenth notes on a green squircle (a
-  superellipse, exponent 3: round corners that ease in continuously,
-  not a rounded square), centred by eye (a little high and left: the heads
-  weigh it down, the beam right), nothing else behind the notes. In the
-  app the green is the theme's `primary` (the links' green), from a light to
-  a deep shade of it; the favicon uses the same mark in #5da602. Beside a
-  title and its subtitle it is as tall as both lines (44pt).
+- The logo is the website's mark: three rounded bars of a level meter on a
+  glossy green tile (#5ff08f to #14833b). The app (`src/ui/logo.tsx`), the
+  favicon and the website's header draw the same mark; the tray draws the
+  three bars alone, in the panel's text colour. Beside a title and its
+  subtitle it is as tall as both lines (44pt).
 
 ## Layout and density
 

@@ -63,17 +63,18 @@ export function trayTitle(title: string): string {
   return t.length > 60 ? `${t.slice(0, 59)}…` : t;
 }
 
-/** The tray glyph (beamed notes, the app's music mark) in `color`, as an
- * SVG data URI. Monochrome: a template on macOS, the panel's text color
- * elsewhere. */
+/** The tray glyph (the logo's three level bars) in `color`, as an SVG data
+ * URI. Monochrome: a template on macOS, the panel's text color elsewhere. */
 export function trayIcon(color: string): string {
   // `token()` gives #rrggbbaa; SVG renderers differ on 8-digit hex.
   if (/^#[0-9a-f]{8}$/i.test(color)) color = color.slice(0, 7);
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">` +
-    `<g fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
-    `<path d="M9 18V5l12-2v13"/></g>` +
-    `<circle cx="6" cy="18" r="3" fill="${color}"/><circle cx="18" cy="16" r="3" fill="${color}"/></svg>`;
+    `<g fill="${color}">` +
+    `<rect x="4" y="9.5" width="4" height="11" rx="2"/>` +
+    `<rect x="10" y="3.5" width="4" height="17" rx="2"/>` +
+    `<rect x="16" y="12.5" width="4" height="8" rx="2"/>` +
+    `</g></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
