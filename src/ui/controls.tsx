@@ -2,7 +2,7 @@
 // compose these; they do not restyle base controls themselves.
 
 import type { JSX } from "nsh";
-import { Image, View } from "nsh";
+import { Image, platform, View } from "nsh";
 import { Button, Slider } from "nsh/base";
 import { Icon, type IconName } from "./icons";
 
@@ -80,6 +80,9 @@ function TextLabel(props: { bold?: boolean; class?: string; children: JSX.Elemen
   return <Text class={`${props.bold ? "font-bold" : ""} ${props.class ?? ""}`}>{props.children}</Text>;
 }
 
+/** Whether the app is drawn in a terminal (no images; text-first layout). */
+export const isTerminal = platform.idiom === "terminal";
+
 /** An item's image, square (or round for an artist), with a glyph fallback. */
 export function Cover(props: {
   src: () => string;
@@ -89,6 +92,16 @@ export function Cover(props: {
   class?: string;
 }) {
   const round = () => props.round ?? false;
+  // A terminal can't draw images. A sized cover becomes a small glyph; a card's
+  // full-width cover collapses so it doesn't leave a tall empty box.
+  if (isTerminal) {
+    if (!props.size) return <View class="hidden" />;
+    return (
+      <View class={`shrink-0 items-center justify-center text-muted-foreground ${props.class ?? ""}`} style={{ width: props.size, height: Math.min(props.size, 22) }}>
+        <Icon name={props.fallback ?? "music"} size={16} color="muted-foreground" />
+      </View>
+    );
+  }
   return (
     <View
       class={`shrink-0 items-center justify-center overflow-hidden bg-secondary text-muted-foreground ${
