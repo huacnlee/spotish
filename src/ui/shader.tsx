@@ -2,6 +2,7 @@
 // slow and desaturated rather than a clash of colors — plus a little dither so
 // the dark gradient has no banding. NSH drawing live WGSL under native views.
 
+import type { JSX } from "nsh";
 import { Shader, View } from "nsh";
 
 const AURORA = /* wgsl */ `
