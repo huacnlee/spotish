@@ -63,8 +63,8 @@ function LibraryRow(props: { item: () => Item | undefined }) {
         const it = item();
         if (it) store.openAndCloseDrawer({ name: "collection", uri: it.uri });
       }}
-      class="flex-row items-center gap-3 rounded-(--radius) p-2 hover:bg-sidebar-accent active:opacity-75 focus:outline focus:outline-2 focus:outline-ring"
-      classList={{ "justify-center": rail(), "bg-sidebar-accent": selected() }}
+      class="flex-row items-center gap-3 rounded-(--radius) p-2 hover:bg-white/10 active:opacity-75 focus:outline focus:outline-2 focus:outline-ring"
+      classList={{ "justify-center": rail(), "bg-white/10": selected() }}
     >
       <Cover src={() => item()?.image ?? ""} size={48} round={kind() === "artist"} fallback={fallbackIcon(kind())} />
       <If when={!rail()}>
@@ -86,7 +86,7 @@ function LibraryRow(props: { item: () => Item | undefined }) {
 function LibraryPanel() {
   const lib = resource(store.epoch, () => store.spotify.library() as Promise<Library>);
   return (
-    <View class="min-h-0 flex-1 rounded-(--radius-panel) bg-sidebar">
+    <View class="min-h-0 flex-1 rounded-(--radius-panel) border border-white/10 bg-black/40">
       <View
         class="h-14 flex-row items-center gap-3 text-muted-foreground"
         classList={{ "justify-center": rail(), "px-5": !rail() }}
@@ -144,7 +144,7 @@ function Account() {
   return (
     <If when={store.signedIn() === true}>
       <View
-        class="h-14 flex-row items-center gap-3 rounded-(--radius-panel) bg-sidebar"
+        class="h-14 flex-row items-center gap-3 rounded-(--radius-panel) border border-white/10 bg-black/40"
         classList={{ "justify-center": rail(), "px-4": !rail() }}
       >
         <Cover src={() => me()?.image ?? ""} size={30} round fallback="user" />
@@ -197,7 +197,7 @@ function Footer() {
 export function Sidebar() {
   return (
     <View class="shrink-0 gap-2 text-sidebar-foreground" style={{ width: rail() ? 72 : 300 }}>
-      <View class="rounded-(--radius-panel) bg-sidebar" classList={{ "p-1": rail(), "p-2": !rail() }}>
+      <View class="rounded-(--radius-panel) border border-white/10 bg-black/40" classList={{ "p-1": rail(), "p-2": !rail() }}>
         <NavItem icon="home" label="Home" route={{ name: "home" }} />
         <NavItem icon="search" label="Search" route={{ name: "search" }} />
       </View>

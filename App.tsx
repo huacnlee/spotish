@@ -9,6 +9,8 @@ import { store } from "./src/ui/store";
 import { IconButton, PillButton } from "./src/ui/controls";
 import { Icon } from "./src/ui/icons";
 import { enter } from "./src/ui/motion";
+import { Ambient } from "./src/ui/shader";
+import { accentColors } from "./src/ui/accent";
 import { Home } from "./src/screens/home";
 import { Search } from "./src/screens/search";
 import { Collection } from "./src/screens/collection";
@@ -73,7 +75,7 @@ function StatusLine() {
 
 function MainView(props: { wide: boolean }) {
   return (
-    <View class={`min-w-0 flex-1 overflow-hidden bg-background ${props.wide ? "rounded-(--radius-panel)" : ""}`}>
+    <View class={`min-w-0 flex-1 overflow-hidden border border-white/10 bg-black/45 ${props.wide ? "rounded-(--radius-panel)" : ""}`}>
       <CurrentScreen />
       <TopBar wide={props.wide} />
       <StatusLine />
@@ -104,7 +106,7 @@ function Phone() {
     <View class="flex-1">
       <MainView wide={false} />
       <MiniPlayer />
-      <View class="flex-row items-stretch border-t border-border bg-player px-2 pt-1 pb-[env(safe-area-inset-bottom)]">
+      <View class="flex-row items-stretch border-t border-white/10 bg-black/45 px-2 pt-1 pb-[env(safe-area-inset-bottom)]">
         <BottomTab name="home" />
         <BottomTab name="search" />
         <BottomTab name="library" />
@@ -117,7 +119,7 @@ function Drawer() {
   return (
     <If when={phone() && store.drawer()}>
       <View class="absolute inset-0 flex-row bg-shell/60" onPress={() => store.drawer.set(false)}>
-        <View class="w-[320px] max-w-[320px] flex-1 bg-shell p-2" onPress={() => {}}>
+        <View class="w-[320px] max-w-[320px] flex-1 bg-black/70 p-2" onPress={() => {}}>
           <Sidebar />
         </View>
       </View>
@@ -173,7 +175,7 @@ function SigningIn() {
 function NowPlayingOverlay() {
   return (
     <If when={store.nowPlaying()}>
-      <View class="absolute inset-0 bg-background">
+      <View class="absolute inset-0">
         <NowPlaying />
       </View>
     </If>
@@ -191,6 +193,12 @@ function App() {
   });
   return (
     <View class="flex-1 bg-shell">
+      {/* The whole app sits on a live, cover-tinted synth backdrop; panels are
+          glass over it, so Spotish glows with the music's color. */}
+      <View class="absolute inset-0">
+        <Ambient colors={accentColors} intensity={0.85} />
+      </View>
+      <View class="absolute inset-0 bg-shell/55" />
       <If when={phone()} else={<Desktop />}><Phone /></If>
       <Drawer />
       <NowPlayingOverlay />

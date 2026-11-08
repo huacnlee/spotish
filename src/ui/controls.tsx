@@ -5,6 +5,7 @@ import type { JSX } from "nsh";
 import { Image, platform, View } from "nsh";
 import { Button, Slider } from "nsh/base";
 import { Icon, type IconName } from "./icons";
+import { accentHex } from "./accent";
 
 /** A borderless icon button: muted, brighter on hover, primary while `on`. */
 export function IconButton(props: {
@@ -19,7 +20,7 @@ export function IconButton(props: {
   // Icons bake their color in, so hover can't recolor them; instead the icon is
   // drawn full-strength and the button dims when idle, brightening on hover —
   // the Spotify feel, and it works with baked-in icon colors.
-  const color = () => (props.on?.() ? "primary" : "foreground");
+  const color = () => (props.on?.() ? accentHex() : "foreground");
   const tone = () => (props.on?.() ? "opacity-100" : "opacity-65 hover:opacity-100");
   return (
     <Button
@@ -32,7 +33,7 @@ export function IconButton(props: {
       <Icon name={props.name()} size={size()} color={color()} />
       {/* A small dot marks an active toggle (shuffle / repeat), as Spotify does. */}
       <If when={props.on?.() ?? false}>
-        <View class="absolute bottom-0.5 size-1 rounded-full bg-primary" />
+        <View class="absolute bottom-0.5 size-1 rounded-full" style={{ backgroundColor: accentHex() }} />
       </If>
     </Button>
   );
@@ -53,13 +54,13 @@ export function PlayButton(props: {
       accessibilityLabel={props.playing() ? "Pause" : "Play"}
       disabled={props.disabled?.() ?? false}
       onPress={props.onPress}
-      class={`items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 active:opacity-85 disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 focus:outline focus:outline-2 focus:outline-ring ${primary() ? "bg-primary" : "bg-control"}`}
-      style={{ width: size(), height: size() }}
+      class={`items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 active:opacity-85 disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 focus:outline focus:outline-2 focus:outline-ring ${primary() ? "" : "bg-control"}`}
+      style={primary() ? { width: size(), height: size(), backgroundColor: accentHex() } : { width: size(), height: size() }}
     >
       <Icon
         name={props.playing() ? "pause" : "play"}
         size={size() * 0.42}
-        color={primary() ? "primary-foreground" : "control-foreground"}
+        color={primary() ? "#ffffff" : "control-foreground"}
       />
     </Button>
   );
@@ -150,7 +151,8 @@ export function BarSlider(props: {
       class={props.class}
       trackClass="h-4 justify-center group"
       indicatorClass="h-1 rounded-full bg-muted"
-      rangeClass="rounded-full bg-foreground group-hover:bg-primary"
+      rangeClass="rounded-full"
+      rangeStyle={{ backgroundColor: accentHex() }}
       thumbClass="size-3 rounded-full bg-foreground opacity-0 group-hover:opacity-100 active:opacity-100 focus:opacity-100"
       onChange={({ value }) => typeof value === "number" && props.onChange(value)}
       onChangeEnd={({ value }) => typeof value === "number" && props.onChangeEnd(value)}

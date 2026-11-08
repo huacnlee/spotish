@@ -157,7 +157,7 @@ function Volume() {
 /** The full desktop player bar. */
 export function PlayerBar() {
   return (
-    <View class="h-[76px] shrink-0 flex-row items-center justify-between gap-4 px-2 bg-player">
+    <View class="h-[76px] shrink-0 flex-row items-center justify-between gap-4 px-2 border-t border-white/10 bg-black/45">
       <NowPlaying />
       <Transport />
       <Volume />
@@ -169,7 +169,7 @@ export function PlayerBar() {
 export function MiniPlayer() {
   return (
     <If when={store.player().title !== ""}>
-      <View class="mx-2 mb-2 h-14 flex-row items-center gap-3 rounded-(--radius-card) bg-card px-2">
+      <View class="mx-2 mb-2 h-14 flex-row items-center gap-3 rounded-(--radius-card) border border-white/10 bg-black/55 px-2">
         <View
           role="button"
           accessibilityLabel="Open the now playing view"
