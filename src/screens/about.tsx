@@ -25,7 +25,7 @@ function LinkRow(props: { label: string; url: string }) {
   return (
     <Button
       onPress={() => store.openExternal(props.url)}
-      class="h-11 flex-row items-center justify-between rounded-(--radius) border border-border bg-card px-4 hover:bg-row-hover active:opacity-70 focus:outline focus:outline-2 focus:outline-ring"
+      class="h-11 flex-row items-center justify-between rounded-(--radius) bg-input px-4 hover:bg-muted active:opacity-70 focus:outline focus:outline-2 focus:outline-ring"
     >
       <Text class="text-sm font-medium text-foreground">{props.label}</Text>
       <View class="text-muted-foreground"><Icon name="chevronRight" size={16} color="muted-foreground" /></View>
@@ -41,7 +41,7 @@ export function About() {
           <Button
             accessibilityLabel="Close"
             onPress={() => store.about.set(false)}
-            class="absolute right-3 top-3 z-10 size-8 items-center justify-center rounded-full bg-card text-muted-foreground hover:bg-row-hover hover:text-foreground active:opacity-60"
+            class="absolute right-3 top-3 z-10 size-8 items-center justify-center rounded-full bg-input text-muted-foreground hover:bg-muted hover:text-foreground active:opacity-60"
           >
             <Icon name="close" size={18} color="muted-foreground" />
           </Button>
@@ -71,7 +71,7 @@ export function About() {
               </View>
 
               {/* Premium */}
-              <View class="gap-2 rounded-(--radius-card) border border-border bg-card p-4">
+              <View class="gap-2 rounded-(--radius-card) bg-input p-4">
                 <Text class="text-sm font-semibold text-foreground">Keeping the ads? Spotify Premium removes them.</Text>
                 <Text class="text-sm leading-[21px] text-muted-foreground">
                   Spotish never blocks Spotify's ads. Premium removes them, plays any track on demand, and supports artists.
