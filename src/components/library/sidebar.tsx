@@ -2,6 +2,7 @@
 // narrow desktop window it is a `compact` rail of icons and covers (each
 // with a tooltip); the phone's drawer shows it in full.
 
+import { hasAppWindow, quitApp } from "../../platform/desktop";
 import { type AnimatedValue, createAnimatedValue, createMotion, effect, List, reduceMotion, signal, Text, untracked, View } from "nsh";
 import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import type { Item } from "../../backend/types";
@@ -321,9 +322,15 @@ function MenuEntries(props: { name: string; image: string }) {
       <Entry icon="info" label="About…" onSelect={() => setAboutOpen(true)} />
       <Entry icon="github" label="GitHub" external onSelect={() => openExternal(REPO_URL)} />
       <Entry icon="code" label="NSH" external onSelect={() => openExternal(NSH_URL)} />
-      <If when={signedIn() === true}>
+      <If when={signedIn() === true || hasAppWindow}>
         <Separator />
+      </If>
+      <If when={signedIn() === true}>
         <Entry icon="logOut" label="Log out" onSelect={() => void signOut()} />
+      </If>
+      {/* Ends the app (the music stops), as the tray's Exit. */}
+      <If when={hasAppWindow}>
+        <Entry icon="power" label="Exit" onSelect={quitApp} />
       </If>
     </>
   );
@@ -332,22 +339,24 @@ function MenuEntries(props: { name: string; image: string }) {
 
 /** The account at the sidebar's foot, which opens the user menu: the
  * user's picture and name (Spotish, signed out). */
-function Account(props: { compact: boolean }) {
+export function Account(props: { compact: boolean; placement?: "top" | "bottom" }) {
   const me = meQuery();
+  // Up from the sidebar's foot; down from the header's corner.
+  const side = () => props.placement ?? "top";
   const name = () => (signedIn() === true ? me.data()?.name || "Account" : "Spotish");
   const open = signal(false);
   return (
     <Menu
       open={open()}
       onOpenChange={(e) => open.set(e.open)}
-      placement="top"
+      placement={side()}
       align="start"
       offset={4}
       popupClass={popupSurface}
       // As wide as the account row, so it opens flush with it.
-      popupStyle={{ ...menuPopupStyle("top", "start"), width: accountMenuWidth() }}
-      popupStartingStyle={menuPopupHidden("top", "start")}
-      popupEndingStyle={menuPopupLeaving("top", "start")}
+      popupStyle={{ ...menuPopupStyle(side(), "start"), width: accountMenuWidth() }}
+      popupStartingStyle={menuPopupHidden(side(), "start")}
+      popupEndingStyle={menuPopupLeaving(side(), "start")}
       trigger={
         <Button
           accessibilityLabel={`User menu: ${name()}`}
@@ -357,7 +366,7 @@ function Account(props: { compact: boolean }) {
             terminal
               ? "px-1 focus:bg-muted"
               : `group h-11 flex-row items-center gap-3 rounded-(--radius-inset) transition duration-200 ease-out hover:bg-row-hover active:scale-[0.98] selected:bg-secondary motion-reduce:transition-none ${focusRing} ${
-                  props.compact ? "justify-center" : "px-2"
+                  props.compact ? `justify-center ${side() === "bottom" ? "w-11 rounded-full" : ""}` : "px-2"
                 }`
           }
         >
@@ -371,8 +380,8 @@ function Account(props: { compact: boolean }) {
           <If when={!props.compact || terminal}>
             <Text class="line-clamp-1 flex-1 text-sm font-semibold text-foreground">{name()}</Text>
             <If when={!terminal}>
-              {/* The menu opens upward: the chevron points to it. */}
-              <View class={`rotate-180 ${LAYER} opacity-60 group-hover:opacity-100 group-hover:-translate-y-0.5`}>
+              {/* The chevron points the way the menu opens. */}
+              <View class={`${side() === "top" ? "rotate-180" : ""} ${LAYER} opacity-60 group-hover:opacity-100 group-hover:-translate-y-0.5`}>
                 <Icon name="chevronDown" size={14} color="muted-foreground" />
               </View>
             </If>

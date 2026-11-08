@@ -39,8 +39,9 @@ the code.
 - A desktop app's window keeps the desktop layout at any size; phones, and
   a browser page narrower than 640pt, get the phone's (tabs, mini player).
   Narrower than 860pt the sidebar is a rail. The header's first button
-  folds the sidebar away entirely (the pages take the whole window) and
-  brings it back, at any width (remembered between runs; it animates like
+  folds the sidebar away entirely (the pages take the whole window; the
+  user's picture comes to the header's top-left corner, opening the same
+  user menu downward) and brings it back, at any width (remembered between runs; it animates like
   a breakpoint).
 - Card grids (an artist's discography, search) fill their row: as many
   columns as fit at about 144pt, the cards widened to share the row out,
@@ -59,6 +60,11 @@ the code.
 - A card's play button is in golden proportion: the 124pt cover is φ³ times
   the button (29pt), the button φ² times its inset (11pt). Play buttons
   have no border, only a soft shadow.
+- The header ends, on a desktop app, with a close button (✕, "Close
+  window"): it closes the main window as the title bar's close does
+  (hidden while the tray keeps the app; the music plays on).
+- Exit ends the app: the last row of the user menu (after Log out) and of
+  the tray menu.
 - The desktop sidebar is 274pt wide, 228pt in a middle window (860 to
   1100pt), a 72pt rail below that. The account menu is exactly as wide as
   the account row (the sidebar less its panel's padding and border), so it
@@ -261,8 +267,9 @@ the code.
   repeat's arrows turn once, the volume's waves come in one by one, the heart
   beats. Small and once per entry.
 - The logo is a pair of beamed sixteenth notes on a green squircle (a
-  superellipse, exponent 5: corners that ease in continuously, not a
-  rounded square), centred by eye, nothing else behind the notes. In the
+  superellipse, exponent 3: round corners that ease in continuously,
+  not a rounded square), centred by eye (a little high and left: the heads
+  weigh it down, the beam right), nothing else behind the notes. In the
   app the green is the theme's `primary` (the links' green), from a light to
   a deep shade of it; the favicon uses the same mark in #5da602. Beside a
   title and its subtitle it is as tall as both lines (44pt).

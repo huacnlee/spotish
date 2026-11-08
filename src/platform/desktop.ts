@@ -77,6 +77,29 @@ export function trayIcon(color: string): string {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
+/** Whether there is an app window to close and an app to exit (a desktop
+ * app; not the web, a phone or a terminal). */
+export const hasAppWindow = isAvailable;
+
+/** Exits the app (its windows close, the music stops). */
+export function quitApp(): void {
+  if (isAvailable) Application.quit();
+}
+
+/** Whether closing the main window hides it (the shell is installed with
+ * `hideOnClose`). */
+let hidesOnClose = false;
+
+/** Closes the main window as its title bar's close does: hidden while the
+ * tray keeps the app (the music plays on), else closed (the app ends). */
+export function closeMainWindow(): void {
+  if (!isAvailable) return;
+  const win = windows().find((w) => w.id === "main") ?? windows()[0];
+  if (!win) return;
+  if (hidesOnClose) win.hide();
+  else win.close();
+}
+
 /** The main window, found while rendering. */
 function mainWindow(): WindowRef | null {
   try {
@@ -103,8 +126,10 @@ export function installDesktopShell(opts: DesktopShellOptions): DesktopShell {
 
   if (opts.hideOnClose !== false) {
     win.set({ closeOnPress: false });
+    hidesOnClose = true;
     const stop = win.on("closePress", () => win.hide());
     cleanup(() => {
+      hidesOnClose = false;
       stop();
       win.set({ closeOnPress: true });
     });
@@ -138,7 +163,7 @@ export function installDesktopShell(opts: DesktopShellOptions): DesktopShell {
           },
         },
         { type: "separator" },
-        { label: "Quit Spotish", onSelect: () => Application.quit() },
+        { label: "Exit", onSelect: quitApp },
       ],
     });
   });

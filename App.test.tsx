@@ -190,6 +190,9 @@ test("the sidebar folds away and comes back", async () => {
   await app.press("role:button[Collapse sidebar]");
   await app.waitFor("role:button[Expand sidebar]");
   expect(app.texts()).not.toContain("Liked Songs");
+  // The account comes up to the header, with its menu.
+  await app.press("role:button[User menu: Ada]");
+  await app.waitFor("Log out");
   await app.press("role:button[Expand sidebar]");
   await app.waitFor("Liked Songs");
 });

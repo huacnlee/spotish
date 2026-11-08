@@ -63,8 +63,8 @@ export const sidebarWidth = () =>
   !sidebarShown() ? 0 : railSidebar() ? RAIL_WIDTH : windowSize().width < ALBUM_COLUMN ? SIDEBAR_MIDDLE : SIDEBAR_WIDE;
 
 /** The user menu's width, pt (tracked): the account row's, so it opens flush
- * with it; from the rail, the wide sidebar's row. */
-export const accountMenuWidth = () => (railSidebar() ? SIDEBAR_WIDE : sidebarWidth()) - ACCOUNT_INSET;
+ * with it; from the rail or the header, the wide sidebar's row. */
+export const accountMenuWidth = () => (railSidebar() || !sidebarShown() ? SIDEBAR_WIDE : sidebarWidth()) - ACCOUNT_INSET;
 
 /** Whether there is room for the album column of track lists (tracked). */
 export const wideTracks = () => layout() === "desktop" && windowSize().width > ALBUM_COLUMN;
