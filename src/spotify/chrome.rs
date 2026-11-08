@@ -247,6 +247,11 @@ impl Browser {
         }
         let child = command.spawn().map_err(|e| format!("{}: {e}", binary.display()))?;
         let mut browser = Browser { child, port: 0 };
+        // The sign-in window has no DevTools port (so sign-in providers accept
+        // it); only the headless player exposes one to wait for.
+        if mode == Mode::SignIn {
+            return Ok(browser);
+        }
         let deadline = Instant::now() + Duration::from_secs(20);
         loop {
             if let Ok(text) = std::fs::read_to_string(&port_file)
