@@ -317,6 +317,14 @@ function MenuEntries(props: { name: string; image: string }) {
   );
 }
 
+/** The user menu's width (`w-64`), pt. */
+const MENU_WIDTH = 256;
+
+/** The desktop sidebar's width, pt: the user menu's plus the account
+ * panel's padding and border on each side (8 + 1), so the menu, opening
+ * above the account row, lines up with it edge to edge. */
+export const SIDEBAR_WIDTH = MENU_WIDTH + 2 * (8 + 1);
+
 /** The account at the sidebar's foot, which opens the user menu: the
  * user's picture and name (Spotish, signed out). */
 function Account(props: { compact: boolean }) {

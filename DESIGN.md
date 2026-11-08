@@ -34,6 +34,17 @@ the code.
   while not liked, red once liked. Never an outline.
 - Menus and popovers are a solid, dark surface (`popover`, a step above the
   window), not a pale grey.
+- The light menu is always the last control on the right, after the volume
+  (the bar and Now Playing alike).
+- A desktop app's window keeps the desktop layout at any size; phones, and
+  a browser page narrower than 640pt, get the phone's (tabs, mini player). Narrower than 1100pt the sidebar is a
+  rail; narrower than 900pt the player bar is compact (what plays, Like,
+  previous / play / next, the volume with its slider, the light menu; the
+  position is in Now Playing); narrower than 640pt the light menu goes
+  too.
+- The desktop sidebar is 274pt: the account menu's 256 plus the account
+  panel's padding and border, so the menu opens flush with the account row,
+  edge to edge.
 - The account menu has no row icons: labels only, starting on the avatar's
   left edge above (rows and header share the 10pt inset). No ↗ marks
   either: a menu row is its words.
@@ -99,6 +110,10 @@ the code.
   don't compete with it: a long, thin, faint position bar; a faint play
   disc with no border or shadow; smaller transport icons; the volume
   collapsed until hovered.
+- Now Playing is responsive: the cover takes the room the window leaves
+  (up to 320pt). Tall, it sits above the words and controls; wide and short
+  (640pt or wider, under 560pt tall), it sits beside them; with too little
+  room for a 96pt cover it gives way, and the words and controls stay.
 - Now Playing closes from a down chevron at the top left: it goes back
   down into the bar, not "back" to a page. In the
   bar, the whole left block (cover, title, artist) opens it.

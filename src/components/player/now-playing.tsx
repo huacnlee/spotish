@@ -27,11 +27,43 @@ function NowPlayingContent() {
   // The same colour as the desktop's player: the cover's.
   const colors = coverColorsQuery(() => player().artwork);
 
+  // Responsive: the cover takes what room the window leaves. Tall, it sits
+  // above the rest; wide and short, beside it; with too little room for
+  // either, it gives way and the words and controls stay.
+  const side = () => windowSize().width >= 640 && windowSize().height < 560;
+  const coverSize = () => {
+    const { width, height } = windowSize();
+    // Room the top row, the words, the position, the controls and the gaps
+    // take (stacked), or the top row and the margins (beside).
+    const size = side() ? Math.min(height - 120, width * 0.38) : Math.min(width - 48, height - 400);
+    const fitted = Math.min(320, Math.floor(size));
+    return fitted < 96 ? 0 : fitted;
+  };
+  const cover = () => (
+    <View style={coverIn.style}>
+      <Cover src={player().artwork} size={coverSize()} class="rounded-2xl shadow-xl" />
+    </View>
+  );
+  const details = () => (
+    <>
+      <View class="flex-row items-center gap-4" style={enter("fadeInUp", 140)}>
+        <NowPlayingSummary large cover={0} />
+        <LikeButton size={24} />
+      </View>
+      <View style={enter("fadeInUp", 200)}>
+        <SeekBar quiet />
+      </View>
+      <View class="items-center" style={enter("fadeInUp", 260)}>
+        <TransportControls large quiet />
+      </View>
+    </>
+  );
+
   return (
     <View class="flex-1 bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* The music's light rises from the bottom of the page. */}
       <MusicLight effect={lightEffect()} colors={colors()} playing={player().playing} reach={windowSize().height * 0.45} />
-      <View class="flex-row justify-between px-4 pt-4">
+      <View class="z-10 flex-row items-center justify-between px-4 pt-4">
         <IconButton name="chevronDown" label="Close Now Playing" short="Back" size={24} onPress={() => setNowPlayingOpen(false)} />
         {/* The corner: the volume (always open here, nothing to reveal) and
             the light. */}
@@ -40,28 +72,26 @@ function NowPlayingContent() {
           <LightMenu placement="bottom" size={22} />
         </View>
       </View>
-      <View class="flex-1 items-center justify-center gap-6 px-6 pb-8">
-        {/* Opening, in layers: the cover grows in, then the words, the
-            position and the controls rise one after another. */}
-        <View class="w-full max-w-64 items-center" style={enter("zoomIn", 60)}>
-          <View class="w-full" style={coverIn.style}>
-            <Cover src={player().artwork} class="rounded-2xl shadow-xl" />
+      <If
+        when={side()}
+        else={
+          <View class="min-h-0 flex-1 items-center justify-center gap-6 px-6 pb-8">
+            {/* Opening, in layers: the cover grows in, then the words, the
+                position and the controls rise one after another. */}
+            <If when={coverSize() > 0}>
+              <View style={enter("zoomIn", 60)}>{cover()}</View>
+            </If>
+            {/* The light leads here: the controls are quiet (thin, faint). */}
+            <View class="w-full max-w-160 gap-6">{details()}</View>
           </View>
+        }
+      >
+        {/* Wide and short: the cover beside the rest. */}
+        <View class="min-h-0 flex-1 flex-row items-center justify-center gap-8 px-8 pb-6">
+          <View style={enter("zoomIn", 60)}>{cover()}</View>
+          <View class="min-w-0 max-w-140 flex-1 gap-5">{details()}</View>
         </View>
-        {/* The light leads here: the controls are quiet (thin, faint). */}
-        <View class="w-full max-w-160 gap-6">
-          <View class="flex-row items-center gap-4" style={enter("fadeInUp", 140)}>
-            <NowPlayingSummary large cover={0} />
-            <LikeButton size={24} />
-          </View>
-          <View style={enter("fadeInUp", 200)}>
-            <SeekBar quiet />
-          </View>
-          <View class="items-center" style={enter("fadeInUp", 260)}>
-            <TransportControls large quiet />
-          </View>
-        </View>
-      </View>
+      </If>
     </View>
   );
 }

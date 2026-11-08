@@ -4,7 +4,7 @@
 
 import { View } from "nsh";
 import { railSidebar } from "../components/layout";
-import { Sidebar } from "../components/library/sidebar";
+import { SIDEBAR_WIDTH, Sidebar } from "../components/library/sidebar";
 import { PlayerBar } from "../components/player/player-bar";
 import { MainStack } from "./main";
 import { nowPlayingOpen } from "../state/overlays";
@@ -12,7 +12,7 @@ import { nowPlayingOpen } from "../state/overlays";
 export function DesktopShell() {
   return (
     <View class="flex-1 flex-row gap-2 p-2">
-      <View class={`shrink-0 ${railSidebar() ? "w-18" : "w-75"}`}>
+      <View class="shrink-0" style={{ width: railSidebar() ? 72 : SIDEBAR_WIDTH }}>
         <Sidebar compact={railSidebar()} />
       </View>
       <View class="relative min-w-0 flex-1">

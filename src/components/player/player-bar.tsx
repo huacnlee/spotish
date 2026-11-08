@@ -12,6 +12,7 @@ import { setCoverTint } from "../../state/tint";
 import { lightEffect } from "../../state/visual";
 import { LightMenu } from "./light-menu";
 import { PlayerGlass } from "../ui/toolbar-fx";
+import { barSize } from "../layout";
 import { enter } from "../ui/motion";
 import { LikeButton, NowPlayingSummary, SeekBar, TransportControls, VolumeControl } from "./parts";
 
@@ -34,22 +35,44 @@ export function PlayerBar() {
       testID="player"
       class="h-18 flex-row items-center justify-between gap-4 rounded-full pl-3.5 pr-5"
     >
-      <View class="w-1/4 min-w-0 flex-row items-center gap-2">
-        {/* A smaller round cover, concentric with the pill: 14pt from its
-            edge on every side (72 = 44 + 2 × 14). */}
-        <NowPlayingSummary openable round cover={44} />
-        <LikeButton />
-      </View>
-      <View class="max-w-180 flex-1 items-center gap-1">
-        <TransportControls quiet />
-        <SeekBar inline quiet />
-      </View>
-      <View class="w-1/4 flex-row items-center justify-end gap-1 pr-2">
-        <LightMenu placement="top" />
-        {/* The volume always shows its slider here, balancing what plays on
-            the left. */}
-        <VolumeControl quiet />
-      </View>
+      <If
+        when={barSize() === "full"}
+        else={
+          // Compact (a narrow window): what plays takes the room; the
+          // transport without shuffle and repeat, and the position is left
+          // to Now Playing, which the left block opens.
+          <>
+            <View class="min-w-0 flex-1 flex-row items-center gap-2">
+              <NowPlayingSummary openable round cover={44} />
+              <LikeButton />
+            </View>
+            <TransportControls quiet minimal />
+            <View class="flex-row items-center justify-end gap-1">
+              <VolumeControl quiet />
+              <If when={barSize() === "compact"}>
+                <LightMenu placement="top" />
+              </If>
+            </View>
+          </>
+        }
+      >
+        <View class="w-1/4 min-w-0 flex-row items-center gap-2">
+          {/* A smaller round cover, concentric with the pill: 14pt from its
+              edge on every side (72 = 44 + 2 × 14). */}
+          <NowPlayingSummary openable round cover={44} />
+          <LikeButton />
+        </View>
+        <View class="max-w-180 flex-1 items-center gap-1">
+          <TransportControls quiet />
+          <SeekBar inline quiet />
+        </View>
+        <View class="w-1/4 flex-row items-center justify-end gap-1 pr-2">
+          {/* The volume always shows its slider here, balancing what plays on
+              the left; the light's menu at the very end. */}
+          <VolumeControl quiet />
+          <LightMenu placement="top" />
+        </View>
+      </If>
     </PlayerGlass>
     </View>
     </View>

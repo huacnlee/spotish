@@ -1,4 +1,4 @@
-// The phone's shell (and a narrow window's): the pages full width, the
+// The phone's shell: the pages full width, the
 // mini player, and tabs for Home, Search and the library, which opens a
 // drawer with the whole sidebar. iOS and Android get the system's tab bar
 // and header; elsewhere the app draws its own.
