@@ -7,7 +7,7 @@
 // heartbeat) don't wipe it, so nothing flickers back. A control that fails
 // drops its change, so nothing stays on screen that did not happen.
 
-import { cleanup, computed, effect, signal, untracked } from "nsh";
+import { Animated, cleanup, type CompositeAnimation, computed, createAnimatedValue, Easing, effect, signal, untracked } from "nsh";
 import { EMPTY_PLAYER, type Item, type PlayerState, positionAt, type RepeatMode, type Track } from "../backend/types";
 import { backend } from "./engine";
 import { type MessageId, notify, report } from "./feedback";
@@ -101,22 +101,76 @@ function named(state: PlayerState): PlayerState {
  * (tracked). */
 export const player = computed<PlayerState>(() => named({ ...EMPTY_PLAYER, ...backend.player(), ...optimistic() }));
 
-const playing = computed(() => player().playing);
 const now = signal(Date.now());
 
-// While playing, the clock ticks so the position moves on.
+// While playing, the clock ticks so the position moves on: once a second,
+// just as the shown second changes (the times show whole seconds; the bar
+// moves natively, `positionFill`).
 effect(() => {
-  if (!playing()) return;
-  now.set(Date.now());
-  const timer = setInterval(() => now.set(Date.now()), 250);
-  cleanup(() => clearInterval(timer));
+  const p = player();
+  if (!p.playing) return;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const tick = () => {
+    const t = Date.now();
+    now.set(t);
+    const at = positionAt(p, t);
+    // At the end it stays there: nothing more to show.
+    if (p.durationMs > 0 && at >= p.durationMs) return;
+    timer = setTimeout(tick, 1000 - (at % 1000) + 4);
+  };
+  tick();
+  cleanup(() => {
+    if (timer !== null) clearTimeout(timer);
+  });
 });
 
 const seekDraft = signal<number | null>(null);
 const volumeDraft = signal<number | null>(null);
 
-/** The position to show: the drag in progress, else the player's (tracked). */
+/** The position to show: the drag in progress, else the player's (tracked).
+ * While it plays it changes once a second (the shown second). */
 export const position = () => seekDraft() ?? positionAt(player(), now());
+
+/** The position as a share of the track (0..1), an animated value moving on
+ * natively while it plays, at the display's rate with no JS per frame: a
+ * linear timing to the end over the time left, set again on every change
+ * of where the player is (a seek, a pause, a new track) and as a drag
+ * moves. The position bar draws its range from it. */
+export const positionFill = createAnimatedValue(0);
+let fillAnchor = "";
+let fillRun: CompositeAnimation | null = null;
+/** Longer than any track: the end is held this long before the hold
+ * repeats (as a deadline, with no frames). */
+const HOLD_MS = 86_400_000;
+effect(() => {
+  const draft = seekDraft();
+  const p = player();
+  const duration = p.durationMs;
+  // Nothing about where it is changed (a heartbeat): it moves on as it is.
+  const anchor = `${draft}|${p.positionMs}|${p.at}|${p.playing}|${duration}`;
+  if (anchor === fillAnchor) return;
+  fillAnchor = anchor;
+  // As the slider shows `position()` over `max(1, duration)`: held to 0..1.
+  const max = Math.max(1, duration);
+  const at = draft ?? positionAt(p, Date.now());
+  const from = Math.min(1, Math.max(0, at / max));
+  fillRun?.stop();
+  fillRun = null;
+  positionFill.set(from);
+  if (draft === null && p.playing && duration > 0 && from < 1) {
+    // To the end, then held there, as one animation that does not end by
+    // itself (as a spinner's): what waits for animations to finish (a
+    // test's step) does not wait for the song to end.
+    fillRun = Animated.loop(
+      Animated.sequence([
+        Animated.timing(positionFill, { toValue: 1, duration: duration - at, easing: Easing.linear }),
+        Animated.delay(HOLD_MS),
+      ]),
+      { resetBeforeIteration: false },
+    );
+    void fillRun.start();
+  }
+});
 
 /** The volume to show, 0 while muted: the drag in progress, else the
  * player's (tracked). */
@@ -127,8 +181,19 @@ export const volumeLevel = () => {
   return p.muted ? 0 : p.volume;
 };
 
+// What many views follow, each on its own: a backend message that changes
+// none of them (the heartbeat, the position) wakes none of their readers
+// (every row of a list asks whether it is the one loaded).
+const loadedTrack = computed(() => player().trackUri);
+const loadedContext = computed(() => player().contextUri);
+const playingNow = computed(() => player().playing);
+const loaded = computed(() => player().title !== "");
+
+/** Whether it plays (tracked; only when that changes). */
+export const isPlaying = () => playingNow();
+
 /** Whether something is loaded (tracked). */
-export const hasTrack = () => player().title !== "";
+export const hasTrack = () => loaded();
 
 /** Whether the controls can act (tracked): the player is ready, and a
  * track (not an ad) is loaded for the ones that need one. */
@@ -136,18 +201,17 @@ export const controlsEnabled = () => ready() && signedIn() === true && hasTrack(
 
 /** Whether `uri` is the collection playing now (tracked). */
 export function isPlayingContext(uri: string): boolean {
-  const p = player();
-  return p.playing && uri !== "" && p.contextUri === uri;
+  return playingNow() && uri !== "" && loadedContext() === uri;
 }
 
 /** Whether `uri` is the collection loaded, playing or not (tracked). */
 export function isCurrentContext(uri: string): boolean {
-  return uri !== "" && player().contextUri === uri;
+  return uri !== "" && loadedContext() === uri;
 }
 
 /** Whether `uri` is the track loaded (tracked). */
 export function isCurrentTrack(uri: string): boolean {
-  return uri !== "" && player().trackUri === uri;
+  return uri !== "" && loadedTrack() === uri;
 }
 
 // ---- Intents ----

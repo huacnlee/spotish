@@ -4,12 +4,13 @@
 // In a terminal (`terminal`), images do not draw: icon-only controls show a
 // short text label, and covers take no Cells.
 
-import { createMotion, effect, Image, platform, type MotionSpec, reduceMotion, Text, untracked, View } from "nsh";
-import type { JSX } from "nsh";
+import { type AnimatedValue, Canvas, effect, Image, platform, type MotionSpec, reduceMotion, Text, token, untracked, View } from "nsh";
+import type { CanvasRenderingContext2D, JSX } from "nsh";
 import { Button, Slider, Tooltip } from "nsh/base";
 import { alpha, tint } from "../../state/tint";
 import { imageFor } from "../../data/images";
 import { Icon, type IconColor, iconMotion, type IconName, SwapIcon } from "./icons";
+import { lazyMotion } from "./motion";
 import { DISTANCE, DURATION, DURATION_CLASS, EASE_CLASS, SCALE, SMOOTH_OUT } from "./tokens";
 
 /** The app runs in a terminal: Cells and text, no images. */
@@ -184,8 +185,9 @@ export function ActionButton(props: {
       </Button>
     );
   }
-  // A new label comes in (not the first: that one just shows).
-  const label = createMotion();
+  // A new label comes in (not the first: that one just shows). Made with
+  // the first new label.
+  const label = lazyMotion();
   let shown = untracked(() => props.label);
   effect(() => {
     const now = props.label;
@@ -276,7 +278,17 @@ export function BarSlider(props: {
   class?: string;
   onChange: (value: number) => void;
   onChangeEnd: (value: number) => void;
+  /** Where the range ends, 0..1, as an animated value that moves natively
+   * (the position while it plays): the range is drawn from it, every
+   * display frame, with no JS, and `value` need only change when its
+   * screen-reader value should. */
+  fill?: AnimatedValue;
 }) {
+  const fill = props.fill;
+  // The range drawn natively from `fill` (not in a terminal, which draws
+  // its own slider of glyphs). The slider's own range stays for its
+  // layout and states, transparent.
+  const drawn = !!fill && !terminal;
   return (
     <Slider
       accessibilityLabel={props.label}
@@ -290,19 +302,61 @@ export function BarSlider(props: {
       // The range fills the track, so both share one centre line.
       // One height at rest and on hover (the taller one): it never jumps.
       indicatorClass={`rounded-full ${props.quiet ? "h-1.5 bg-foreground/8" : "h-2 bg-foreground/12"}`}
-      rangeClass={`h-full rounded-full ${props.quiet ? "bg-foreground/35" : "bg-foreground/55"} disabled:bg-muted-foreground`}
+      rangeClass={`h-full rounded-full ${props.quiet ? "bg-foreground/35" : "bg-foreground/55"} disabled:bg-muted-foreground ${drawn ? "opacity-0" : ""}`}
       // No thumb dot: the bar itself is the control (it still takes the
       // keyboard focus and screen readers through the slider).
       thumbClass="size-0 opacity-0"
       rangeStyle={
-        props.tinted && !props.disabled
+        props.tinted && !props.disabled && !drawn
           ? { backgroundImage: `linear-gradient(90deg, ${alpha(tint(), props.quiet ? 0.2 : 0.3)}, ${alpha(tint(), props.quiet ? 0.4 : 0.6)})` }
           : undefined
       }
       onChange={({ value }) => typeof value === "number" && props.onChange(value)}
       onChangeEnd={({ value }) => typeof value === "number" && props.onChangeEnd(value)}
-    />
+    >
+      {drawn ? (
+        // Over the indicator (the track centres it), presses going through.
+        <View class="pointer-events-none absolute inset-0 justify-center">
+          <Canvas class={`w-full ${props.quiet ? "h-1.5" : "h-2"}`} draw={(cx, size) => drawRange(cx, size, fill, props)} />
+        </View>
+      ) : undefined}
+    </Slider>
   );
+}
+
+/** The range of a `BarSlider` with `fill`, as its classes draw it: a pill
+ * from the start to `fill` of the width (its corners rounded as
+ * `rounded-full` rounds them, so a range shorter than it is tall is
+ * narrower, not cut), in `bg-foreground/55` (`/35` quiet;
+ * `muted-foreground` disabled) and, tinted, the cover's gradient over it,
+ * spread over the range as `linear-gradient(90deg, ..)` is. Only the
+ * colours run JS (when they change); the length is native. */
+function drawRange(
+  cx: CanvasRenderingContext2D,
+  size: { width: number; height: number },
+  fill: AnimatedValue,
+  props: { quiet?: boolean; disabled?: boolean; tinted?: boolean },
+) {
+  const { width: w, height: h } = size;
+  if (w <= 0 || h <= 0) return;
+  const length = fill.mul(w);
+  // `rounded-full`: half the shorter side.
+  const radius = length.interpolate({ inputRange: [0, h], outputRange: [0, h / 2] });
+  cx.beginPath();
+  cx.roundRect(0, 0, length, h, radius);
+  cx.clip();
+  cx.fillStyle = props.disabled ? String(token("muted-foreground")) : alpha(String(token("foreground")), props.quiet ? 0.35 : 0.55);
+  cx.fillRect(0, 0, w, h);
+  if (props.tinted && !props.disabled) {
+    // Drawn at full width and squeezed to the range's: the gradient spans
+    // the range, whatever its length.
+    const gradient = cx.createLinearGradient(0, 0, w, 0);
+    gradient.addColorStop(0, alpha(tint(), props.quiet ? 0.2 : 0.3));
+    gradient.addColorStop(1, alpha(tint(), props.quiet ? 0.4 : 0.6));
+    cx.scale(fill, 1);
+    cx.fillStyle = gradient;
+    cx.fillRect(0, 0, w, h);
+  }
 }
 
 /** A section's title. */

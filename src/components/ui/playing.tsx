@@ -62,18 +62,24 @@ export function PlayingBars(props: { playing: boolean; size?: number }) {
   const height = () => props.size ?? 14;
   if (terminal) return <Text class="text-foreground">♪</Text>;
   const audio = audioLevels();
-  // Changes only when the music starts or stops being metered.
-  const live = computed(() => (audio().level > 0.02 ? 1 : 0));
+  // Changes only when the music starts or stops being metered; paused, the
+  // music's frames are not followed.
+  const live = computed(() => (props.playing && audio().level > 0.02 ? 1 : 0));
   // The levels reach the shader as animated values: its layer is not sent
-  // anew with each of the music's frames, which would take what is behind
-  // the player's glass again each time (the mark draws before it).
+  // anew with each of the music's frames.
   const levels = liveValues(3);
   effect(() => {
+    // Paused: at rest, and the music's frames not followed (not read).
+    if (!props.playing) {
+      levels.set(0, 0);
+      levels.set(1, 0);
+      levels.set(2, 0);
+      return;
+    }
     const a = audio();
-    const on = props.playing;
-    levels.set(0, on ? a.bass : 0);
-    levels.set(1, on ? a.mid : 0);
-    levels.set(2, on ? a.treble : 0);
+    levels.set(0, a.bass);
+    levels.set(1, a.mid);
+    levels.set(2, a.treble);
   });
   return (
     <View accessibilityLabel={props.playing ? "Playing" : "Paused"} style={{ width: height(), height: height() }}>

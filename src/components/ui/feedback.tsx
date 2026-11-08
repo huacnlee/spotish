@@ -1,7 +1,7 @@
 // Feedback surfaces: the toasts, a page's error state, and the skeletons
 // that stand in for content while it loads.
 
-import { cleanup, createMotion, effect, Overlay, safeArea, signal, Text, untracked, View, windowSize } from "nsh";
+import { type AnimatedValue, cleanup, createAnimatedValue, createMotion, effect, Overlay, reduceMotion, safeArea, signal, Text, untracked, View, windowSize } from "nsh";
 import type { JSX } from "nsh";
 import { Button, Toast, type ToastEntry, ToastStack } from "nsh/base";
 import { choose, dismiss, dismissNewest, setToastsExpanded, toastContent, toasts } from "../../state/feedback";
@@ -114,10 +114,52 @@ export function EmptyState(props: { title: string; detail?: string }) {
  * shapes, so the skeleton's own opacity is free for the reveal. */
 function Block(props: { class: string }) {
   if (terminal) return <View class={`bg-muted ${props.class}`} />;
-  const motion = createMotion();
-  void motion.play(SKELETON_PULSE);
-  cleanup(() => motion.stop());
-  return <View class={`rounded-sm bg-muted ${props.class}`} style={motion.style} />;
+  const pulse = joinPulse();
+  cleanup(pulse.leave);
+  return <View class={`rounded-sm bg-muted ${props.class}`} style={{ opacity: pulse.value }} />;
+}
+
+/** The pulse of the shapes made together (a skeleton's, in one go). */
+interface Pulse {
+  value: AnimatedValue;
+  users: number;
+}
+
+/** The pulse the shapes made in this turn share. */
+let forming: Pulse | null = null;
+
+/** A shape's pulse: one opacity, `SKELETON_PULSE` played on it, for every
+ * shape made in the same turn. They would each have played their own from
+ * the same frame, in step: one value draws the same, without nine native
+ * values per shape made, stopped and released with each skeleton. It stops
+ * when its last shape goes. */
+function joinPulse(): { value: AnimatedValue; leave: () => void } {
+  let pulse = forming;
+  if (!pulse) {
+    const made: Pulse = { value: createAnimatedValue(1), users: 0 };
+    // As `motion.play` does: with less motion asked for, it rests where it
+    // ends (fully shown).
+    if (!reduceMotion()) {
+      const { keyframes, ...timing } = SKELETON_PULSE;
+      void made.value.keyframes((keyframes as { opacity: number[] }).opacity, timing);
+    }
+    forming = made;
+    void Promise.resolve().then(() => {
+      if (forming === made) forming = null;
+    });
+    pulse = made;
+  }
+  const joined = pulse;
+  joined.users += 1;
+  return {
+    value: joined.value,
+    leave: () => {
+      joined.users -= 1;
+      if (joined.users > 0) return;
+      if (forming === joined) forming = null;
+      void joined.value.stop();
+    },
+  };
 }
 
 /** Content that loads: `placeholder` (a skeleton, or an error) while there is

@@ -183,10 +183,8 @@ export function audioLevels(): Accessor<AudioFrame> {
 /** Animated values that follow numbers set from JS: each `set` reaches the
  * shader as a value of its own (`ShaderLayer` slots), so the shader draws
  * again without its layer being sent anew. Sending the layer anew counts as
- * a change of the view's drawing, and the platform then takes what is
- * behind every glass that view may draw under (a whole-window picture,
- * rendered and read back) on each of the music's frames. Only changed
- * numbers are sent. */
+ * a change of the view's drawing, which costs a commit on each of the
+ * music's frames. Only changed numbers are sent. */
 export function liveValues(count: number) {
   const values = Array.from({ length: count }, () => createAnimatedValue(0));
   const last = new Array<number>(count).fill(0);

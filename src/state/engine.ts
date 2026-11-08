@@ -5,6 +5,7 @@
 
 import { host, platform } from "nsh";
 import { DemoBackend, type DemoOptions } from "../backend/demo";
+import { enrich } from "../backend/fixtures";
 import { engineBackend } from "../backend/engine";
 import { BRIDGE_SOURCE } from "../bridge/source";
 import type { Backend } from "../backend/types";
@@ -28,6 +29,8 @@ function demo(p: Record<string, unknown>): Backend {
     if (typeof p.signedIn === "boolean") options.signedIn = p.signedIn;
     if (typeof p.ad === "boolean") options.ad = p.ad;
     if (typeof p.latency === "number") options.latency = p.latency;
+    // A library as large as a real one, with covers (performance runs).
+    if (p.demo === "rich") enrich();
     backend = new DemoBackend(options);
     g[DEMO_KEY] = backend;
   }

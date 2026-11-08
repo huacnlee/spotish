@@ -8,6 +8,7 @@ import { cleanup, keymap, mount, View } from "nsh";
 import { layout } from "./src/components/layout";
 import { NowPlayingSheet } from "./src/components/player/now-playing";
 import { Toaster } from "./src/components/ui/feedback";
+import { TitleBar } from "./src/components/ui/title-bar";
 import { AboutDialog, FirstRunSheet, SigningInDialog } from "./src/pages/dialogs";
 import { DesktopShell } from "./src/shells/desktop";
 import { PhoneShell } from "./src/shells/phone";
@@ -78,6 +79,11 @@ function App() {
   return (
     <View class="flex-1 bg-sidebar">
       <Shortcuts />
+      {/* The desktop shell keeps only its columns under the window controls
+          clear of them; the others start below the whole title bar. */}
+      <If when={layout() !== "desktop"}>
+        <TitleBar />
+      </If>
       <If when={layout() === "desktop"}>
         <DesktopShell />
       </If>

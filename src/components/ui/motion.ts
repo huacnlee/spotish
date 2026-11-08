@@ -8,7 +8,25 @@
 // component from `nsh/base` (a `Button`) reads all its props in one binding,
 // so a prop that ticks (`selected` following the player) would replay it.
 
-import { cleanup, createMotion, effect, LayoutAnimation, platform, reduceMotion, signal, untracked, type MotionName, type MotionSpec } from "nsh";
+import {
+  Animated,
+  type AnimatedValue,
+  cleanup,
+  type CompositeAnimation,
+  createAnimatedValue,
+  createMotion,
+  type Easing,
+  effect,
+  LayoutAnimation,
+  platform,
+  reduceMotion,
+  signal,
+  untracked,
+  type Motion,
+  type MotionName,
+  type MotionOptions,
+  type MotionSpec,
+} from "nsh";
 import { DISTANCE, DURATION, EASING, SMOOTH_OUT } from "./tokens";
 
 /** A style that plays `preset` once when the view mounts; spread it into
@@ -18,18 +36,122 @@ export function enter(preset: MotionName = "fadeInUp", delay = 0) {
   return untracked(() => createMotion({ enter: preset, delay }).style);
 }
 
+// ---- Lean motions ----
+//
+// A list item's entrance moves two channels of a view (a row: its opacity
+// and `translateX`; its cover: opacity and `rotateY`). `createMotion` makes
+// an animated value for each of its nine channels (and two more nodes for
+// the scale), so every cell of every list would cost eleven native nodes
+// per motion, made, stopped and released with it. These make only the
+// channels that move, and play the same keyframes on them with the same
+// timing (`Animated.keyframes` is what a motion runs on each channel).
+
+/** The channels lean motions move, with where each rests. */
+const REST = { opacity: 1, translateX: 0, translateY: 0, rotateY: 0 } as const;
+type LeanChannel = keyof typeof REST;
+
+/** Keyframes of each channel, played with one timing (`MotionSpec`'s
+ * per-channel form). */
+interface LeanSpec<C extends LeanChannel> {
+  tracks: Record<C, { offset: number; value: number }[]>;
+  duration: number;
+  easing: Easing;
+}
+
+/** Animated values for `channels` only, at rest, and keyframes to play on
+ * them; as a `Motion` plays, honouring reduced motion (it lands where it
+ * ends). */
+function leanMotion<C extends LeanChannel>(channels: readonly C[]) {
+  const values = {} as Record<C, AnimatedValue>;
+  for (const c of channels) values[c] = createAnimatedValue(REST[c]);
+  let running: CompositeAnimation | null = null;
+  const stop = () => {
+    running?.stop();
+    running = null;
+  };
+  return {
+    values,
+    play(spec: LeanSpec<C>, delay: number) {
+      stop();
+      if (reduceMotion()) {
+        for (const c of channels) {
+          const track = spec.tracks[c];
+          values[c].set(track[track.length - 1].value);
+        }
+        return;
+      }
+      running = Animated.parallel(
+        channels.map((c) =>
+          Animated.keyframes(values[c], { keyframes: spec.tracks[c], duration: spec.duration, easing: spec.easing, delay }),
+        ),
+      );
+      void running.start();
+    },
+    stop,
+    /** Stops it and puts every channel back at rest. */
+    reset() {
+      stop();
+      for (const c of channels) values[c].set(REST[c]);
+    },
+  };
+}
+
+/** A motion made the first time it is wanted (`get()`): until then its
+ * `style` binds nothing, which looks the same (a motion at rest changes
+ * nothing), so a control that may never move (a glyph never hovered, never
+ * swapped) makes no native nodes, and none are stopped and released when
+ * it goes. Read `style` where it binds (`style={m.style}`): it follows. */
+export function lazyMotion(options?: MotionOptions) {
+  const made = signal<Motion | null>(null);
+  const get = (): Motion => {
+    let m = untracked(made);
+    if (!m) {
+      m = createMotion(options);
+      made.set(m);
+    }
+    return m;
+  };
+  return {
+    /** The motion's style once it is made (tracked). */
+    get style() {
+      return made()?.style;
+    },
+    /** The motion, made now if it was not. */
+    get,
+    /** Plays `motion` (making it first). */
+    play(motion: MotionName | MotionSpec, play?: Parameters<Motion["play"]>[1]) {
+      return get().play(motion, play);
+    },
+    /** Stops it where it is (nothing if never made). */
+    stop() {
+      untracked(made)?.stop();
+    },
+    /** Puts it back at rest (nothing if never made: it is at rest). */
+    reset() {
+      untracked(made)?.reset();
+    },
+  };
+}
+
 /** An item sliding in along `axis` from `distance` points away (positive:
  * from the right, or from below) while it fades in, on the long smooth-out
  * curve, passing its place by a hair (1pt) before it settles. A row comes in
  * with `translateX` (NSH's `fadeInRight`: right to left), a card with
  * `translateY` (`fadeInUp`); each as one piece. */
-function slideIn(axis: "translateX" | "translateY", distance: number, duration: number): MotionSpec {
+function slideIn<A extends "translateX" | "translateY">(axis: A, distance: number, duration: number): LeanSpec<"opacity" | A> {
   return {
-    keyframes: [
-      { opacity: 0, [axis]: distance },
-      { opacity: 1, [axis]: -1, offset: 0.7 },
-      { opacity: 1, [axis]: 0 },
-    ],
+    tracks: {
+      opacity: [
+        { offset: 0, value: 0 },
+        { offset: 0.7, value: 1 },
+        { offset: 1, value: 1 },
+      ],
+      [axis]: [
+        { offset: 0, value: distance },
+        { offset: 0.7, value: -1 },
+        { offset: 1, value: 0 },
+      ],
+    } as LeanSpec<"opacity" | A>["tracks"],
     duration,
     easing: SMOOTH_OUT,
   };
@@ -109,16 +231,22 @@ export function waveDelay(index: number, turns: number): number {
 /** A cover flipping open (NSH's `flipInY`, in our tokens) over `duration`:
  * it turns from edge-on (90°) to face the viewer about its vertical axis,
  * past by a few degrees before it settles, fading in over the first part of
- * the turn. */
-function coverFlipSpec(duration: number): MotionSpec {
+ * the turn. Turning the other way round: its left edge swings in toward
+ * the viewer, following the row as it slides in from the right. */
+function coverFlipSpec(duration: number): LeanSpec<"opacity" | "rotateY"> {
   return {
-    keyframes: [
-      // Turning the other way round: its left edge swings in toward the
-      // viewer, following the row as it slides in from the right.
-      { opacity: 0, rotateY: -90 },
-      { opacity: 1, rotateY: 8, offset: 0.65 },
-      { opacity: 1, rotateY: 0 },
-    ],
+    tracks: {
+      opacity: [
+        { offset: 0, value: 0 },
+        { offset: 0.65, value: 1 },
+        { offset: 1, value: 1 },
+      ],
+      rotateY: [
+        { offset: 0, value: -90 },
+        { offset: 0.65, value: 8 },
+        { offset: 1, value: 0 },
+      ],
+    },
     duration,
     easing: SMOOTH_OUT,
   };
@@ -240,8 +368,10 @@ export function listItemEntrance(options: {
 }) {
   const wave = options.wave;
   if (!wave || platformTerminal()) return { style: undefined, cover: undefined };
-  const item = createMotion();
-  const flip = createMotion();
+  const axis = options.axis;
+  // Only the channels that move (`leanMotion`): made once per cell.
+  const item = leanMotion(["opacity", axis] as const);
+  const flip = leanMotion(["opacity", "rotateY"] as const);
   let last = "";
   let lastEntry = -1;
   let seq = 0;
@@ -261,15 +391,15 @@ export function listItemEntrance(options: {
         const duration = Math.round(WAVE_DURATION * (0.92 + 0.16 * scatter(index, 2)));
         const lag = COVER_LAG + Math.round(scatter(index, 3) * COVER_LAG_SPREAD);
         const turn = Math.round(WAVE_DURATION * (0.75 + 0.5 * scatter(index, 4)));
-        void item.play(slideIn(options.axis, distance, duration), { delay });
-        void flip.play(coverFlipSpec(turn), { delay: delay + lag });
+        item.play(slideIn(axis, distance, duration), delay);
+        flip.play(coverFlipSpec(turn), delay + lag);
       });
       if (shown) {
         // Hidden where it starts until its turn comes.
-        item.opacity.set(0);
-        item[options.axis].set(distance);
-        flip.opacity.set(0);
-        flip.rotateY.set(-90);
+        item.values.opacity.set(0);
+        item.values[axis].set(distance);
+        flip.values.opacity.set(0);
+        flip.values.rotateY.set(-90);
       } else {
         // Shown before in this entry (a cell given it back): at rest.
         item.reset();
@@ -281,9 +411,12 @@ export function listItemEntrance(options: {
     item.stop();
     flip.stop();
   });
+  // As a motion's style binds them; the channels at rest are left out (they
+  // change nothing).
+  const slide = item.values[axis];
   return {
-    style: item.style,
-    cover: { opacity: flip.opacity, transform: [{ perspective: COVER_PERSPECTIVE }, ...flip.transform] },
+    style: { opacity: item.values.opacity, transform: [axis === "translateX" ? { translateX: slide } : { translateY: slide }] },
+    cover: { opacity: flip.values.opacity, transform: [{ perspective: COVER_PERSPECTIVE }, { rotateY: flip.values.rotateY }] },
   };
 }
 

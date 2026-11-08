@@ -2,7 +2,7 @@
 // Now Playing and the terminal: the transport, the position, the volume,
 // Like and what plays. They read the player store and call its intents.
 
-import { cleanup, createMotion, effect, type MotionSpec, reduceMotion, signal, Text, View } from "nsh";
+import { cleanup, createMotion, effect, type Motion, type MotionSpec, reduceMotion, signal, Text, View } from "nsh";
 import { Button } from "nsh/base";
 import { clock } from "../../backend/types";
 import { openPremium } from "../../state/links";
@@ -16,6 +16,7 @@ import {
   next,
   player,
   position,
+  positionFill,
   previous,
   seek,
   setVolume,
@@ -29,6 +30,7 @@ import { ready } from "../../state/session";
 import { Digits } from "../ui/digits";
 import { BarSlider, Cover, focusRing, IconButton, PlayButton, terminal, TextLink } from "../ui/controls";
 import type { IconName } from "../ui/icons";
+import { lazyMotion } from "../ui/motion";
 import { DURATION, EASING, SCALE } from "../ui/tokens";
 
 const REPEAT_LABEL = { off: "Repeat", context: "Repeat one", track: "Don't repeat" } as const;
@@ -86,6 +88,7 @@ export function SeekBar(props: { inline?: boolean; quiet?: boolean }) {
       label="Playback position"
       value={position()}
       max={duration()}
+      fill={positionFill}
       disabled={!controlsEnabled() || player().ad}
       class="flex-1"
       onChange={dragSeek}
@@ -174,8 +177,18 @@ export function VolumeControl(props: { class?: string; collapsible?: boolean; qu
  * sprays a burst of red dots (transitions.dev's "Like button"); unliking only
  * dips it. Both play from the press alone, never when a track changes. */
 export function LikeButton(props: { size?: number }) {
-  const pop = createMotion();
-  const dots = Array.from({ length: LIKE_DOTS }, () => createMotion({ initial: { opacity: 0 } }));
+  // Made with the first press: most hearts are never pressed (each dot's
+  // motion is nine native values).
+  const pop = lazyMotion();
+  let dots: Motion[] = [];
+  const made = signal(false);
+  const makeDots = () => {
+    if (dots.length === 0) {
+      dots = Array.from({ length: LIKE_DOTS }, () => createMotion({ initial: { opacity: 0 } }));
+      made.set(true);
+    }
+    return dots;
+  };
   cleanup(() => {
     pop.stop();
     for (const d of dots) d.stop();
@@ -202,10 +215,11 @@ export function LikeButton(props: { size?: number }) {
       return;
     }
     void pop.play(LIKE_POP);
+    const flying = makeDots();
     bursting.set(true);
     // Each like re-rolls every dot's angle, reach, size, speed and start, so
     // the spray never repeats.
-    void Promise.all(dots.map((d, i) => d.play(burst(i, k())))).then(() => {
+    void Promise.all(flying.map((d, i) => d.play(burst(i, k())))).then(() => {
       if (id === burstId) bursting.set(false);
     });
   };
@@ -224,8 +238,8 @@ export function LikeButton(props: { size?: number }) {
           onPress={press}
         />
       </View>
-      <If when={!terminal && bursting()}>
-        {dots.map((d) => (
+      <If when={!terminal && bursting() && made()}>
+        {makeDots().map((d) => (
           <View
             class="pointer-events-none absolute rounded-full bg-liked"
             // Mounted only while a burst plays; it starts and ends at opacity 0.
@@ -312,8 +326,9 @@ export function NowPlayingSummary(props: { cover?: number; round?: boolean; open
   const subtitle = () => (player().ad ? "Advertisement" : player().artist);
   // Each new track arrives: the cover, then the words (not the first one
   // shown, which comes in with the player).
-  const coverIn = createMotion();
-  const wordsIn = createMotion();
+  // Made with the first new track.
+  const coverIn = lazyMotion();
+  const wordsIn = lazyMotion();
   let shown = `${player().title}|${player().artwork}`;
   effect(() => {
     const now = `${player().title}|${player().artwork}`;
@@ -360,6 +375,7 @@ export function NowPlayingSummary(props: { cover?: number; round?: boolean; open
       }
     >
       <Button
+        testID="open-now-playing"
         accessibilityLabel={`Open Now Playing: ${player().title}, ${player().artist}`}
         onPress={() => setNowPlayingOpen(true)}
         class={`group min-w-0 flex-1 flex-row items-center gap-3 rounded-full pr-2 active:scale-[0.98] motion-reduce:active:scale-100 ${focusRing}`}

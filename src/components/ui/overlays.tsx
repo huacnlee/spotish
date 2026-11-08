@@ -6,6 +6,7 @@ import { createMotion, type JSX, type MotionSpec, View } from "nsh";
 import { Dialog, Sheet } from "nsh/base";
 import { terminal } from "./controls";
 import { enter } from "./motion";
+import { TitleBar } from "./title-bar";
 
 /** A dialog's entrance: up a little from slightly smaller, settling
  * without overshoot, as the scrim fades. */
@@ -78,6 +79,12 @@ export function AppSheet(props: {
       popupClass={panel()}
       backdropClass={props.full ? "bg-background" : BACKDROP}
     >
+      {/* A side panel reaches the window's top edge: the title bar's band
+          keeps it clear of the window controls and drags the window. A
+          full one (Now Playing) places its own top row under them. */}
+      <If when={props.side === "left" && !props.full}>
+        <TitleBar brand={false} />
+      </If>
       {/* The content rises in behind the sliding panel. */}
       <If when={!terminal} else={props.children}>
         <View class={props.full || props.side === "left" ? "flex-1" : ""} style={enter("fadeInUp", 90)}>

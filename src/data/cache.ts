@@ -41,8 +41,19 @@ function storageKey(account: string, key: string): string {
   return accountPrefix(account) + key;
 }
 
+/** An entry as Storage keeps it: `JSON.stringify({ savedAt, v })`, written
+ * from the JSON the entry already has rather than serializing `v` again. */
+function stored(entry: Entry): string {
+  return `${storedHead(entry.savedAt)}${entry.json}}`;
+}
+
+/** What a stored entry starts with, up to `v`'s JSON. */
+function storedHead(savedAt: number): string {
+  return `{"savedAt":${JSON.stringify(savedAt)},"v":`;
+}
+
 function persist(k: string, entry: Entry) {
-  Storage.setItem(k, JSON.stringify({ savedAt: entry.savedAt, v: entry.v })).catch((error) =>
+  Storage.setItem(k, stored(entry)).catch((error) =>
     console.warn("spotish: the cache could not save an entry:", String(error)),
   );
 }
@@ -77,7 +88,12 @@ export function hydrate(): Promise<void> {
         try {
           const parsed = raw ? (JSON.parse(raw) as { savedAt?: unknown; v?: unknown }) : null;
           if (!parsed || typeof parsed.savedAt !== "number" || parsed.v === undefined) throw new Error("bad entry");
-          loaded.push([k, { savedAt: parsed.savedAt, v: parsed.v, json: JSON.stringify(parsed.v) }]);
+          // `v`'s JSON is the stored text after the head (as `stored` writes
+          // it): taken as it is, not serialized again (a large playlist
+          // costs QuickJS a stringify per entry at every launch).
+          const head = storedHead(parsed.savedAt);
+          const json = raw!.startsWith(head) && raw!.endsWith("}") ? raw!.slice(head.length, -1) : JSON.stringify(parsed.v);
+          loaded.push([k, { savedAt: parsed.savedAt, v: parsed.v, json }]);
         } catch {
           forget(k);
         }

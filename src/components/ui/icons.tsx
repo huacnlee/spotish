@@ -4,7 +4,8 @@
 // again when the appearance changes. A terminal draws no images: icon-only
 // controls show text there instead (see `controls.tsx`).
 
-import { batch, cleanup, colorScheme, createMotion, effect, Image, type MotionName, type MotionSpec, reduceMotion, signal, type Tokens, token, untracked, View } from "nsh";
+import { batch, cleanup, colorScheme, effect, Image, type MotionName, type MotionSpec, reduceMotion, signal, type Tokens, token, untracked, View } from "nsh";
+import { lazyMotion } from "./motion";
 import { BLUR, DURATION, EASING, SCALE } from "./tokens";
 
 export type IconName =
@@ -185,8 +186,9 @@ const RECOLOR: MotionSpec = {
  * had. A new colour of the same glyph fades in (`RECOLOR`). Its first
  * glyph just shows; nothing moves at rest or with reduced motion. `t` (the hover morph) is the glyph showing. */
 export function SwapIcon(props: IconProps) {
-  const incoming = createMotion();
-  const outgoing = createMotion();
+  // Made on the first swap: most glyphs never swap.
+  const incoming = lazyMotion();
+  const outgoing = lazyMotion();
   /** The glyph going: swapped out (`swap`, blurring) or a colour fading off. */
   const leaving = signal<{ name: IconName; hex: string; swap: boolean } | null>(null);
   /** How far through the swap's blur: `BLUR_STEPS` at rest. */
@@ -342,7 +344,8 @@ function specOf(name: IconName): MotionSpec {
  * entry plays it once from rest, ending at rest; nothing when the user
  * asked for less motion. */
 export function iconMotion() {
-  const motion = createMotion();
+  // Made on the first hover: most glyphs are never hovered.
+  const motion = lazyMotion();
   const t = signal(0);
   let timer: ReturnType<typeof setInterval> | null = null;
   const stopMorph = () => {
@@ -356,7 +359,10 @@ export function iconMotion() {
     // Outside a component: nothing to stop with.
   }
   return {
-    style: motion.style,
+    /** Bind it in a binding (`style={hover.style}`): it follows. */
+    get style() {
+      return motion.style;
+    },
     /** How far through the glyph's morph (pass to `Icon`'s `t`). */
     t: () => t(),
     play(name: IconName) {

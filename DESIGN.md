@@ -126,9 +126,9 @@ the code.
 
 - A pill floating over the right-hand pages, the sidebar fixed on the left.
   The pages scroll under it.
-- Liquid Glass, drawn by a shader: refraction at the rim, frost, a body
-  darkened toward the player colour for legibility, the music light inside.
-  Not a gradient, not a sheen.
+- A solid surface in the player colour, the music light inside. Not a
+  gradient, not a sheen, and no glass: it does not read the pages behind
+  it, which would cost every scroll frame a picture of them.
 - Its border is a single 1px line that catches light. No glow on the border.
 - The controls are quiet, here as in Now Playing: the light leads. A faint
   play disc (no border or shadow), thin faint sliders.

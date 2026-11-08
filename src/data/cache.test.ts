@@ -2,7 +2,7 @@
 // another's, a new epoch loading again, the size cap, and a failed load
 // keeping what was cached. Driven by plain signals, without the app.
 import { expect, test } from "nsh/test";
-import { signal } from "nsh";
+import { signal, Storage } from "nsh";
 import { CAPACITY, type CacheSource, cachedQuery, cacheSize, clearAccount, clearMemory, hydrate, readCache, writeCache } from "./cache";
 
 function tick(ms = 0) {
@@ -89,4 +89,16 @@ test("the least recently used entries go past the cap", async () => {
   expect(cacheSize()).toBe(CAPACITY);
   expect(readCache("acct-a", "k0")).toBeUndefined();
   expect(readCache("acct-a", `k${CAPACITY + 4}`)).toBe(CAPACITY + 4);
+});
+
+test("an entry is stored as the JSON of { savedAt, v }", async () => {
+  await hydrate();
+  clearMemory();
+  const value = { name: "Mix \"1\"", tracks: [1, 2.5, null, "ü"], nested: { a: true } };
+  writeCache("acct-s", "stored", value);
+  await tick(10);
+  const raw = await Storage.getItem("cache:v1:acct-s:stored");
+  const parsed = JSON.parse(raw ?? "null") as { savedAt: number; v: unknown };
+  expect(raw).toBe(JSON.stringify({ savedAt: parsed.savedAt, v: value }));
+  expect(parsed.v).toEqual(value);
 });
