@@ -36,10 +36,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # QuickJS is C (bindgen needs libclang); the Linux host links GTK 4 and GStreamer (NSH's audio).
-      - name: Install clang, GTK 4 and GStreamer
+      # QuickJS is C (bindgen needs libclang); the Linux host links GTK 4, WebKitGTK (NSH's web views) and GStreamer
+      # (its audio).
+      - name: Install clang, GTK 4, WebKitGTK and GStreamer
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev libgtk-4-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev libgtk-4-dev libwebkitgtk-6.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
