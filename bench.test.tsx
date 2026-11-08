@@ -47,7 +47,7 @@ test("bench 2: scroll Home far down and back", async () => {
   for (let i = 0; i < 6; i++) await app.scroll("Made for you", -300);
 });
 
-test("bench 3: scroll a long playlist under the glass", async () => {
+test("bench 3: scroll a long playlist under the player", async () => {
   const app = await start();
   await app.wait(1500);
   mark("playlist-scroll");

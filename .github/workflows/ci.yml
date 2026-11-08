@@ -43,16 +43,16 @@ jobs:
           curl -fsSL https://nsh.dev/install.sh | sh -s -- --nightly
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Cargo.toml pins NSH's crates to the commit the CLI was built from.
+      # Cargo.lock holds NSH's main at the commit the CLI was built from.
       # The nightly tag moves; say so when they part (see CONTRIBUTING.md).
-      - name: Compare the CLI with the pinned NSH
+      - name: Compare the CLI with the locked NSH
         run: |
           cli="$(nsh --version | sed -n 's/.*(\([0-9a-f]*\)).*/\1/p')"
-          pinned="$(sed -n 's/^nsh-core = .*rev = "\([0-9a-f]*\)".*/\1/p' Cargo.toml)"
-          echo "nsh CLI: $cli, Cargo.toml rev: $pinned"
-          case "$pinned" in
+          locked="$(grep -A2 '^name = "nsh-core"$' Cargo.lock | sed -n 's/^source = ".*#\([0-9a-f]*\)"$/\1/p')"
+          echo "nsh CLI: $cli, Cargo.lock: $locked"
+          case "$locked" in
             "$cli"*) ;;
-            *) echo "::warning::The nightly nsh CLI ($cli) is not the NSH commit Cargo.toml pins ($pinned); raise rev in Cargo.toml." ;;
+            *) echo "::warning::The nightly nsh CLI ($cli) is not the NSH commit Cargo.lock holds ($locked); run cargo update -p nsh-core." ;;
           esac
 
       - name: nsh check

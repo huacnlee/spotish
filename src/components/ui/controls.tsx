@@ -154,7 +154,7 @@ export function PlayButton(props: { playing: boolean; size?: number; disabled?: 
       accessibilityLabel={label()}
       disabled={props.disabled ?? false}
       onPress={props.onPress}
-      class={`group items-center justify-center overflow-hidden rounded-full ${props.quiet ? "" : "border border-foreground/20 bg-background/80 shadow-md hover:shadow-lg active:shadow-sm"} ${PRESS} ${PRESSED} disabled:opacity-40 ${focusRing}`}
+      class={`group items-center justify-center overflow-hidden rounded-full ${props.quiet ? "" : "bg-background/80 shadow-md hover:shadow-lg active:shadow-sm"} ${PRESS} ${PRESSED} disabled:opacity-40 ${focusRing}`}
       style={{ width: size(), height: size(), ...(props.tinted || props.quiet ? { backgroundColor: alpha(tint(), props.quiet ? 0.08 : 0.16) } : {}) }}
     >
       {/* A shade that comes in on hover and deepens as it presses. */}

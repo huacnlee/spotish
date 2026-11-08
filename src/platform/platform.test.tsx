@@ -111,7 +111,7 @@ describe("tray", () => {
   test("titles and icon", () => {
     expect(trayTitle("  ")).toBe("Not playing");
     expect(trayTitle("x".repeat(80))).toHaveLength(60);
-    expect(decodeURIComponent(trayIcon("#ffeeddff"))).toContain('stroke="#ffeedd"');
+    expect(decodeURIComponent(trayIcon("#ffeeddff"))).toContain('fill="#ffeedd"');
   });
 });
 

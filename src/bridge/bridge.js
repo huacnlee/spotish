@@ -37,7 +37,7 @@
   "use strict";
 
   const PROTOCOL = 1;
-  const REVISION = 4;
+  const REVISION = 5;
   // Liked Songs' cover: the library reports it; the tracks query does not.
   const LIKED_IMAGE = "https://misc.scdn.co/liked-songs/liked-songs-640.png";
   let likedImage = "";
@@ -230,6 +230,45 @@
     const expected = last.positionMs + (last.playing ? next.at - last.at : 0);
     if (Math.abs(next.positionMs - expected) > driftMs) return true; // a seek
     return next.playing && now - last.at >= heartbeatMs;
+  };
+
+  // The progress bar's time, in milliseconds: its clocks give the length
+  // (the right one may count down, "-1:23", what is left), its slider the
+  // share played (its unit may be ms, seconds or a fraction, so it is read
+  // as a share of its range). Null when the bar shows nothing.
+  const barTime = (positionText, durationText, slider) => {
+    const pos = clockMs(positionText);
+    const raw = String(durationText || "").trim();
+    const dur = raw.startsWith("-") ? pos + clockMs(raw.slice(1)) : clockMs(raw);
+    if (dur > 0) {
+      const share = slider && slider.max > 0 ? Math.min(1, Math.max(0, slider.value / slider.max)) : null;
+      return { positionMs: share === null ? pos : Math.round(share * dur), durationMs: dur };
+    }
+    if (slider && slider.max > 0) return { positionMs: Math.round(slider.value), durationMs: Math.round(slider.max) };
+    return null;
+  };
+
+  // The position and length of what plays, from the page's media elements
+  // and its progress bar (`bar`: { positionMs, durationMs } or null). The
+  // page can hold more than one element at once (the next track preloading,
+  // an ad's, an old one not yet dropped), so an element counts only when its
+  // length is the bar's; one that plays is preferred, and of those the one
+  // nearest the bar's position. With no element matching, the bar's own
+  // numbers; with no bar, a playing element, else any.
+  const pickMedia = (elements, bar) => {
+    const known = elements.filter((m) => m && isFinite(m.duration) && m.duration > 0);
+    if (bar && bar.durationMs > 0) {
+      const same = known.filter((m) => Math.abs(m.duration * 1000 - bar.durationMs) <= 2000);
+      const pool = same.some((m) => !m.paused) ? same.filter((m) => !m.paused) : same;
+      if (!pool.length) return null;
+      return pool.reduce((a, b) => (Math.abs(b.currentTime * 1000 - bar.positionMs) < Math.abs(a.currentTime * 1000 - bar.positionMs) ? b : a));
+    }
+    return known.find((e) => !e.paused) || known[0] || null;
+  };
+  const timeOf = (elements, bar) => {
+    const m = pickMedia(elements, bar);
+    if (m) return { positionMs: Math.round(m.currentTime * 1000), durationMs: Math.round(m.duration * 1000) };
+    return bar && bar.durationMs > 0 ? { positionMs: bar.positionMs, durationMs: bar.durationMs } : null;
   };
 
   // The ad check: the page's marker, or its own controls saying "not now".
@@ -539,10 +578,19 @@
     shared.onPlay = (element) => {
       shared.media = [element].concat(shared.media.filter((m) => m !== element)).slice(0, 4);
     };
-    const media = () => {
-      const seen = shared.media.concat([...doc.querySelectorAll("video, audio")]);
-      return seen.find((m) => !m.paused && m.duration > 0) || seen.find((m) => m.duration > 0 || m.src) || null;
+    // The progress bar's time now (see `barTime`).
+    const currentBar = () => {
+      const range = inBar(SEL.progress);
+      return barTime(
+        inBar(SEL.position) && inBar(SEL.position).textContent,
+        inBar(SEL.duration) && inBar(SEL.duration).textContent,
+        range && Number(range.max) > 0 ? { value: Number(range.value), max: Number(range.max) } : null,
+      );
     };
+    const allMedia = () => shared.media.concat([...doc.querySelectorAll("video, audio")]);
+    // The media element of what plays: the one whose length is the bar's
+    // (others may be the next track warming up, or an old one).
+    const media = () => pickMedia(allMedia(), currentBar());
 
     // A GraphQL query of the player's, with its headers.
     // Samples a cover (Spotify's image hosts allow it) at 24 × 24 into a
@@ -870,25 +918,16 @@
       const shuffle = inBar(SEL.shuffle);
       const titleLink = inBar(SEL.title);
       const contextLink = inBar(SEL.context);
-      const range = inBar(SEL.progress);
       const next = inBar(SEL.next);
       const previous = inBar(SEL.previous);
-      const m = media();
       const title = (meta && meta.title) || (titleLink && titleLink.textContent) || "";
       const trackId = trackIdFromHref(titleLink && titleLink.getAttribute("href"));
       const ad = adNow(meta, title);
-      let positionMs;
-      let durationMs;
-      if (m && isFinite(m.duration) && m.duration > 0) {
-        positionMs = Math.round(m.currentTime * 1000);
-        durationMs = Math.round(m.duration * 1000);
-      } else if (range && Number(range.max) > 0) {
-        positionMs = Math.round(Number(range.value));
-        durationMs = Math.round(Number(range.max));
-      } else {
-        positionMs = clockMs(inBar(SEL.position) && inBar(SEL.position).textContent);
-        durationMs = clockMs(inBar(SEL.duration) && inBar(SEL.duration).textContent);
-      }
+      // The bar's numbers, checked against the media elements, which are
+      // finer but not all the one playing.
+      const time = timeOf(allMedia(), currentBar()) || { positionMs: 0, durationMs: 0 };
+      const positionMs = time.positionMs;
+      const durationMs = time.durationMs;
       return {
         title,
         artist: (meta && meta.artist) || "",
@@ -1073,8 +1112,7 @@
         const max = rangeOf(input).max;
         const scale = state.durationMs > 0 && Math.abs(max - state.durationMs) / state.durationMs > 0.02 ? max / state.durationMs : 1;
         const wanted = Math.min(target, state.durationMs || target);
-        const m = media();
-        const confirm = m ? () => Math.abs(m.currentTime * 1000 - wanted) <= 2000 : null;
+        const confirm = () => Math.abs(playerState().positionMs - wanted) <= 2000;
         await setRange("seek", SEL.progress, wanted * scale, confirm);
         const after = playerState();
         return { positionMs: after.positionMs, at: after.at };
@@ -1233,6 +1271,9 @@
     rangeOf,
     stateKey,
     shouldPost,
+    timeOf,
+    pickMedia,
+    barTime,
     adFrom,
     isDisabled,
     usable,

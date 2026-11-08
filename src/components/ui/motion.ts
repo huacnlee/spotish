@@ -17,6 +17,7 @@ import {
   createMotion,
   type Easing,
   effect,
+  LayoutAnimation,
   platform,
   reduceMotion,
   signal,
@@ -417,4 +418,26 @@ export function listItemEntrance(options: {
     style: { opacity: item.values.opacity, transform: [axis === "translateX" ? { translateX: slide } : { translateY: slide }] },
     cover: { opacity: flip.values.opacity, transform: [{ perspective: COVER_PERSPECTIVE }, { rotateY: flip.values.rotateY }] },
   };
+}
+
+/** Animates the layout when `step` changes (a breakpoint is crossed: the
+ * sidebar opens or narrows, the player bar or Now Playing rearranges):
+ * what moves or resizes glides there, what comes or goes fades. Not on every
+ * size change (a window being dragged follows the pointer at once), only
+ * when the arrangement does. */
+export function animateLayoutOn(step: () => string): void {
+  let last: string | null = null;
+  effect(() => {
+    const now = step();
+    if (last !== null && now !== last && !reduceMotion()) {
+      const curve = { type: "easeInEaseOut" as const };
+      LayoutAnimation.configureNext({
+        duration: DURATION.base,
+        update: curve,
+        create: { ...curve, property: "opacity" },
+        delete: { ...curve, property: "opacity" },
+      });
+    }
+    last = now;
+  });
 }

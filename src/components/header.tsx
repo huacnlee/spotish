@@ -11,7 +11,10 @@ import { Icon } from "./ui/icons";
 import { openPremium } from "../state/links";
 import { player } from "../state/player";
 import { signedIn, signIn } from "../state/session";
-import { layout } from "./layout";
+import { layout, sidebarShown } from "./layout";
+import { Account } from "./library/sidebar";
+import { closeMainWindow, hasAppWindow } from "../platform/desktop";
+import { sidebarCollapsed, toggleSidebar } from "../state/sidebar";
 import { ActionButton, IconButton, terminal } from "./ui/controls";
 
 /** Log in while signed out; Premium for a free account; nothing
@@ -23,7 +26,7 @@ export function AccountAction() {
         {/* A narrow window: the same action as an icon, so the header
             never runs out of room. */}
         <If when={layout() === "desktop" && windowSize().width < 640} else={<ActionButton label="Premium" onPress={openPremium} />}>
-          <IconButton name="sparkles" label="Premium" hint onPress={openPremium} />
+          <IconButton name="crown" label="Premium" hint onPress={openPremium} />
         </If>
       </If>
       <If when={signedIn() === false}>
@@ -111,6 +114,20 @@ export function PageHeader(props: { title: string; showTitle?: boolean }) {
           : "min-h-14 flex-row items-center gap-2 px-4 pt-[env(safe-area-inset-top)]"
       }
     >
+      {/* With the sidebar folded away, the account comes up here: the
+          user's picture, which opens the user menu. */}
+      <If when={desktop() && !terminal && !sidebarShown()}>
+        <Account compact placement="bottom" />
+      </If>
+      {/* Folds the sidebar away entirely, or brings it back. */}
+      <If when={desktop() && !terminal}>
+        <IconButton
+          name={sidebarCollapsed() ? "sidebarExpand" : "sidebarCollapse"}
+          label={sidebarCollapsed() ? "Expand sidebar" : "Collapse sidebar"}
+          hint
+          onPress={toggleSidebar}
+        />
+      </If>
       <If when={canBack() || desktop()}>
         <IconButton name="chevronLeft" label="Go back" short="Back" disabled={!canBack()} onPress={back} />
       </If>
@@ -127,6 +144,11 @@ export function PageHeader(props: { title: string; showTitle?: boolean }) {
         <SearchField />
       </If>
       <AccountAction />
+      {/* Closes the main window, as the title bar's close would: it hides
+          while the tray keeps the app (the music plays on). */}
+      <If when={desktop() && !terminal && hasAppWindow}>
+        <IconButton name="close" label="Close window" hint onPress={closeMainWindow} />
+      </If>
     </View>
   );
 }
