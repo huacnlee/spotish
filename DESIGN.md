@@ -38,19 +38,19 @@ the code.
   (the bar and Now Playing alike).
 - A desktop app's window keeps the desktop layout at any size; phones, and
   a browser page narrower than 640pt, get the phone's (tabs, mini player). Narrower than 1100pt the sidebar is a
-  rail; narrower than 900pt the player bar is compact (what plays, Like,
-  previous / play / next, the volume with its slider, the light menu; the
-  position is in Now Playing); narrower than 640pt the light menu goes
-  too.
+  rail; narrower than 900pt the player bar is compact, one row, left and
+  right: the cover, title and Like on the left; the transport and the light
+  menu on the right; no position or volume (Now Playing has both). Narrower
+  than 640pt it is stacked: taller, two rows (a 36pt radius): the cover,
+  the title and artist centred, and Like; under them the transport centred
+  and the light menu at the end; under 560pt shuffle and repeat go too. The
+  header's Premium becomes an icon under 640pt.
 - The desktop sidebar is 274pt: the account menu's 256 plus the account
   panel's padding and border, so the menu opens flush with the account row,
   edge to edge.
-- The account menu has no row icons: labels only, starting on the avatar's
-  left edge above (rows and header share the 10pt inset). No ↗ marks
-  either: a menu row is its words.
-
-## The music light (shaders)
-
+- The account menu's rows have an icon, centred in a slot as wide as the
+  avatar above (32pt), so icons line up under the avatar's centre and
+  labels under the name; a page that opens in the browser ends in ↗.
 - The light comes from the cover. Extract a palette from it (up to eight
   colours, `coverColorsQuery`); each effect declares how many colours it uses
   and repeats them when the cover has fewer.
@@ -61,16 +61,18 @@ the code.
 - It moves with the music, with crests: louder bands rise as peaks, the beat
   swells them. Every effect must have music-driven peaks. Edges are smooth
   (no hard top edge).
-- Thirteen effects, chosen from the ✦ menu on the player bar and in Now
-  Playing ("Music light": one numbered line per effect, 01 to 13, the one in
+- Fourteen effects, chosen from the ✦ menu on the player bar and in Now
+  Playing ("Music light": one numbered line per effect, 01 to 14, the one in
   use marked with a check on the right, scrolling when taller than the
   room; remembered, the same one in both). Dots, Grid and Wave first (the
   best; Dots the default), then Orb (a sphere fully covered in dots,
   turning, its surface pushed out by the spectrum), Spectrum, Bars, Ribbons, Halo (a wave
   running into a smooth ring), Aurora (rays under a crisp hem), Mountains
   (many fine ridgelines in perspective), Mesh (the same terrain as a net of
-  rows and columns), Particles (a wave of dots in perspective) and Strings
-  (vibrating strings). Lines are crisp: a thin bright core in a soft glow,
+  rows and columns), Particles (a wave of dots in perspective) Strings
+  (vibrating strings) and Rhythm (a rhythm game's note highway: seven
+  lanes, notes falling to a judgement line that pulses on the beat, key
+  beams as loud as each lane's part of the spectrum). Lines are crisp: a thin bright core in a soft glow,
   never only a blur. Their flow comes from a clock read with the music's
   levels, never `nsh.time`.
 - Each effect has its own height in Now Playing (the terrains and the

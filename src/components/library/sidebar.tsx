@@ -273,12 +273,24 @@ function SignedOutPrompt(props: { compact: boolean }) {
   );
 }
 
-/** One row of the user menu: its label only. No icons or marks: the words
- * start on the avatar's left edge above (the same 10pt inset). */
-function Entry(props: { label: string; onSelect: () => void }) {
+/** One row of the user menu: its icon, centred in a slot as wide as the
+ * avatar above (so the icons line up under its centre and the labels under
+ * the name), the label, and a mark for a page that opens in the browser. */
+function Entry(props: { icon: IconName; label: string; external?: boolean; onSelect: () => void }) {
+  const hover = iconMotion();
   return (
     <MenuItem onSelect={props.onSelect} class={terminal ? "px-1 focus:bg-muted" : menuItem}>
-      <Text class="flex-1 text-sm text-popover-foreground">{props.label}</Text>
+      <View onMouseEnter={() => hover.play(props.icon)} class="flex-1 flex-row items-center gap-2.5">
+        <If when={!terminal}>
+          <View class="w-8 items-center" style={hover.style}>
+            <Icon name={props.icon} size={16} color="muted-foreground" />
+          </View>
+        </If>
+        <Text class="flex-1 text-sm text-popover-foreground">{props.label}</Text>
+        <If when={props.external && !terminal}>
+          <Icon name="externalLink" size={14} color="muted-foreground" />
+        </If>
+      </View>
     </MenuItem>
   );
 }
@@ -302,16 +314,16 @@ function MenuEntries(props: { name: string; image: string }) {
         <Separator />
       </If>
       <If when={!premium()}>
-        <Entry label="Premium" onSelect={openPremium} />
+        <Entry icon="sparkles" label="Premium" external onSelect={openPremium} />
       </If>
-      <Entry label="Spotify" onSelect={() => openExternal(SPOTIFY_URL)} />
+      <Entry icon="music" label="Spotify" external onSelect={() => openExternal(SPOTIFY_URL)} />
       <Separator />
-      <Entry label="About…" onSelect={() => setAboutOpen(true)} />
-      <Entry label="GitHub" onSelect={() => openExternal(REPO_URL)} />
-      <Entry label="NSH" onSelect={() => openExternal(NSH_URL)} />
+      <Entry icon="info" label="About…" onSelect={() => setAboutOpen(true)} />
+      <Entry icon="github" label="GitHub" external onSelect={() => openExternal(REPO_URL)} />
+      <Entry icon="code" label="NSH" external onSelect={() => openExternal(NSH_URL)} />
       <If when={signedIn() === true}>
         <Separator />
-        <Entry label="Log out" onSelect={() => void signOut()} />
+        <Entry icon="logOut" label="Log out" onSelect={() => void signOut()} />
       </If>
     </>
   );

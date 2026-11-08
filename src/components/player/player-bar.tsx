@@ -1,7 +1,7 @@
 // The player as each shell shows it: the desktop's bar, the phone's mini
 // player and the terminal's status rows. All are made of `parts.tsx`.
 
-import { effect, Text, token, View } from "nsh";
+import { effect, Text, token, View, windowSize } from "nsh";
 import { Button } from "nsh/base";
 import { setNowPlayingOpen } from "../../state/overlays";
 import { hasTrack, player, toggle } from "../../state/player";
@@ -25,35 +25,60 @@ export function PlayerBar() {
   const light = () => cover() || String(token("primary"));
   // The controls take the same colour.
   effect(() => setCoverTint(cover()));
+  // Too narrow for shuffle and repeat beside the rest.
+  const tiny = () => windowSize().width < 560;
+  const stacked = () => barSize() === "stacked";
   return (
     <View style={enter("fadeInUp", 120)}>
-    <View class="rounded-full shadow-xl">
+    <View class={`shadow-xl ${stacked() ? "rounded-[36px]" : "rounded-full"}`}>
     <PlayerGlass
       effect={lightEffect()}
       colors={colors()}
       playing={player().playing}
       testID="player"
-      class="h-18 flex-row items-center justify-between gap-4 rounded-full pl-3.5 pr-5"
+      radius={stacked() ? 36 : undefined}
+      class={stacked() ? "gap-2 rounded-[36px] px-3.5 pb-2.5 pt-3.5" : "h-18 flex-row items-center justify-between gap-4 rounded-full pl-3.5 pr-5"}
     >
       <If
         when={barSize() === "full"}
         else={
-          // Compact (a narrow window): what plays takes the room; the
-          // transport without shuffle and repeat, and the position is left
-          // to Now Playing, which the left block opens.
+          <If
+            when={stacked()}
+            else={
+              // Compact (a middle width): one row, left and right: what plays
+              // and Like take the room on the left; the transport and the
+              // light's menu sit on the right. No position or volume (Now
+              // Playing has both).
+              <>
+                <View class="min-w-0 flex-1 flex-row items-center gap-2">
+                  <NowPlayingSummary openable round cover={44} />
+                  <LikeButton />
+                </View>
+                <TransportControls quiet />
+                <LightMenu placement="top" />
+              </>
+            }
+          >
+          {/* Stacked (a narrow window): taller, in two rows, so nothing
+              runs out of the pill. Above, what plays (its words centred
+              between the cover and Like); below, the transport, centred,
+              the light's menu at the end. No volume or position. */}
           <>
-            <View class="min-w-0 flex-1 flex-row items-center gap-2">
-              <NowPlayingSummary openable round cover={44} />
+            <View class="h-11 flex-row items-center gap-2">
+              <NowPlayingSummary openable round center cover={44} />
               <LikeButton />
             </View>
-            <TransportControls quiet minimal />
-            <View class="flex-row items-center justify-end gap-1">
-              <VolumeControl quiet />
-              <If when={barSize() === "compact"}>
+            <View class="h-10 flex-row items-center">
+              <View class="w-9" />
+              <View class="min-w-0 flex-1 items-center">
+                <TransportControls quiet minimal={tiny()} />
+              </View>
+              <View class="w-9 items-end">
                 <LightMenu placement="top" />
-              </If>
+              </View>
             </View>
           </>
+          </If>
         }
       >
         <View class="w-1/4 min-w-0 flex-row items-center gap-2">

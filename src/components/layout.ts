@@ -7,13 +7,14 @@ import { platform, windowSize } from "nsh";
 
 export type Layout = "desktop" | "phone" | "terminal";
 
-/** Narrower than this, the desktop's player bar is compact: what plays and
- * the transport, without the position and the volume slider. */
+/** Narrower than this, the desktop's player bar is compact: one row, what
+ * plays on the left, the transport on the right, no position or volume. */
 const COMPACT_BAR = 900;
+/** Narrower than this, it is stacked: two rows, what plays over the
+ * transport. */
+const STACKED_BAR = 640;
 /** Narrower than this, a page in a browser gets the phone's layout. */
 const WEB_NARROW = 640;
-/** Narrower than this, the compact bar also leaves out the light menu. */
-const TINY_BAR = 640;
 /** Narrower than this, the desktop's sidebar is a rail. */
 const RAIL = 1100;
 
@@ -26,10 +27,10 @@ export function layout(): Layout {
   return "desktop";
 }
 
-/** How much the desktop's player bar shows (tracked). */
-export const barSize = (): "full" | "compact" | "tiny" => {
+/** How the desktop's player bar is laid out (tracked). */
+export const barSize = (): "full" | "compact" | "stacked" => {
   const w = windowSize().width;
-  return w < TINY_BAR ? "tiny" : w < COMPACT_BAR ? "compact" : "full";
+  return w < STACKED_BAR ? "stacked" : w < COMPACT_BAR ? "compact" : "full";
 };
 
 /** Whether the desktop's sidebar is a rail of icons (tracked). */
@@ -40,4 +41,4 @@ export const wideTracks = () => layout() === "desktop" && windowSize().width > R
 
 /** The room a page leaves at its end: on the desktops the player floats
  * over the bottom of the pages, so their last rows scroll clear of it. */
-export const pageEnd = () => (layout() === "desktop" ? "pb-28" : "pb-8");
+export const pageEnd = () => (layout() !== "desktop" ? "pb-8" : barSize() === "stacked" ? "pb-36" : "pb-28");

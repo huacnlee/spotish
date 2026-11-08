@@ -613,6 +613,50 @@ fn glow(p: vec2f, uv: vec2f) -> vec4f {
 }
 `;
 
+// A rhythm game's note highway: seven lanes side by side, notes falling
+// down them to a judgement line, each lane's key beam rising as loud as its
+// part of the spectrum (the outer lanes the bass, the middle the treble),
+// the line pulsing on the beat.
+const RHYTHM = /* wgsl */ `
+fn glow(p: vec2f, uv: vec2f) -> vec4f {
+  let room = max(uniforms.reach, 12.0);
+  let n = 7.0;
+  // Lanes sized to the room, the highway centred.
+  let lw = clamp(room * 0.2, 18.0, 60.0);
+  let left = (nsh.size.x - lw * n) * 0.5;
+  let x = (p.x - left) / lw;
+  let on_road = step(0.0, x) * step(x, n);
+  let lane = clamp(floor(x), 0.0, n - 1.0);
+  let fx = fract(x);
+  let up = nsh.size.y - p.y;
+  let top = room + 6.0;
+  let judge = 3.0 + room * 0.12;
+  let v = spectrum(abs((lane + 0.5) / n - 0.5) * 2.0);
+  let fade = smoothstep(top, top * 0.55, up) * step(0.0, up);
+  // The lanes' dividers, a device pixel wide, brighter at the rails.
+  let edge = min(fx, 1.0 - fx) * lw;
+  let rail = select(0.16, 0.4, x < 0.5 || x > n - 0.5);
+  let divider = clamp(1.0 - edge * nsh.scale, 0.0, 1.0) * rail;
+  // Notes: in each lane a slot of the falling track holds one or not (the
+  // same ones each time round), brighter while the lane is loud.
+  let span = room * 0.24 + 6.0;
+  let s = (up - judge) / span + uniforms.clock * 1.6;
+  let f = fract(s);
+  let held = step(hash(vec2f(lane, floor(s))), 0.42);
+  let thick = clamp(span * 0.26, 3.0, 9.0);
+  let px = span * nsh.scale;
+  let along = clamp((thick / span - f) * px, 0.0, 1.0) * clamp(f * px, 0.0, 1.0);
+  let across = smoothstep(0.06, 0.12, fx) * smoothstep(0.94, 0.88, fx);
+  let note = held * along * across * step(judge, up) * (0.5 + 0.5 * v);
+  // The judgement line, and the key beams standing on it.
+  let line = exp(-pow((up - judge) / 1.1, 2.0)) * (0.55 + 0.45 * uniforms.beat);
+  let beam = pow(v, 1.4) * smoothstep(judge + room * 0.7, judge, up) * step(judge - 1.0, up)
+    * smoothstep(0.0, 0.35, fx) * smoothstep(1.0, 0.65, fx) * 0.55;
+  let a = on_road * fade * (divider + note * 0.95 + line * 0.9 + beam);
+  return vec4f(cycle((lane + 0.5) / n * 0.75), a * (0.6 + 0.4 * uniforms.level));
+}
+`;
+
 // The music's light alone: nothing read from behind, so drawing it with
 // every change of the music costs little at any size. Kept inside the
 // surface's shape, a pixel in from its rim.
@@ -642,12 +686,13 @@ const LIGHTS = {
   mesh: /* wgsl */ `${HEAD}${TERRAIN}${MESH}${LIGHT_TAIL}`,
   particles: /* wgsl */ `${HEAD}${TERRAIN}${PARTICLES}${LIGHT_TAIL}`,
   strings: /* wgsl */ `${HEAD}${STRINGS}${LIGHT_TAIL}`,
+  rhythm: /* wgsl */ `${HEAD}${RHYTHM}${LIGHT_TAIL}`,
 } as const;
 
 export type ToolbarEffect = keyof typeof LIGHTS;
 
 /** How many of the cover's colours each effect uses (up to four). */
-const COLORS: Record<ToolbarEffect, number> = { spectrum: 3, ribbons: 3, bars: 3, aurora: 3, wave: 3, halo: 3, mountains: 3, mesh: 3, particles: 3, strings: 3, orb: 3, dots: 3, grid: 3 };
+const COLORS: Record<ToolbarEffect, number> = { spectrum: 3, ribbons: 3, bars: 3, aurora: 3, wave: 3, halo: 3, mountains: 3, mesh: 3, particles: 3, strings: 3, orb: 3, dots: 3, grid: 3, rhythm: 3 };
 
 /** Each effect's name, for the switch. */
 export const EFFECT_NAMES: Record<ToolbarEffect, string> = {
@@ -664,6 +709,7 @@ export const EFFECT_NAMES: Record<ToolbarEffect, string> = {
   orb: "Orb",
   dots: "Dots",
   grid: "Grid",
+  rhythm: "Rhythm",
 };
 export const TOOLBAR_EFFECTS = Object.keys(LIGHTS) as ToolbarEffect[];
 
@@ -683,6 +729,7 @@ const REACH: Record<ToolbarEffect, number> = {
   particles: 0.9,
   strings: 0.5,
   orb: 1,
+  rhythm: 0.9,
 };
 
 // The music's numbers among HEAD's uniforms, by slot.

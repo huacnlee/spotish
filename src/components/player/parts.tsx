@@ -308,7 +308,7 @@ const NEW_WORDS: MotionSpec = {
 /** What plays: the cover (`cover` points; 0 for none), which opens Now
  * Playing when `openable`, the title and the artist; during an ad, the ad's own artwork and title, and a link to
  * Premium. */
-export function NowPlayingSummary(props: { cover?: number; round?: boolean; openable?: boolean; large?: boolean }) {
+export function NowPlayingSummary(props: { cover?: number; round?: boolean; openable?: boolean; large?: boolean; center?: boolean }) {
   const subtitle = () => (player().ad ? "Advertisement" : player().artist);
   // Each new track arrives: the cover, then the words (not the first one
   // shown, which comes in with the player).
@@ -333,12 +333,12 @@ export function NowPlayingSummary(props: { cover?: number; round?: boolean; open
     </View>
   );
   const words = (selectable: boolean) => (
-    <View class="min-w-0 flex-1 gap-0.5" style={wordsIn.style} selectable={selectable}>
-      <Text class={`line-clamp-1 font-semibold text-foreground ${props.large ? "text-3xl font-extrabold" : "text-sm"}`}>
+    <View class={`min-w-0 flex-1 gap-0.5 ${props.center ? "items-center" : ""}`} style={wordsIn.style} selectable={selectable}>
+      <Text class={`line-clamp-1 font-semibold text-foreground ${props.large ? "text-3xl font-extrabold" : "text-sm"} ${props.center ? "text-center" : ""}`}>
         {player().title || "Nothing playing"}
       </Text>
-      <View class="min-w-0 flex-row items-center gap-2">
-        <Text class={`line-clamp-1 min-w-0 shrink text-muted-foreground ${props.large ? "text-base" : "text-xs"}`}>{subtitle()}</Text>
+      <View class={`min-w-0 flex-row items-center gap-2 ${props.center ? "justify-center" : ""}`}>
+        <Text class={`line-clamp-1 min-w-0 shrink text-muted-foreground ${props.large ? "text-base" : "text-xs"} ${props.center ? "text-center" : ""}`}>{subtitle()}</Text>
         <If when={player().ad}>
           <TextLink label="Get Premium" onPress={openPremium} />
         </If>
