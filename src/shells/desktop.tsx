@@ -18,8 +18,8 @@ export function DesktopShell() {
   animateLayoutOn(() => `${sidebarWidth()}|${barSize()}`);
   return (
     <View class="flex-1">
-      {/* The header's controls, from where the pages begin. */}
-      <TitleBar inset={sidebarShown() ? 8 + sidebarWidth() + 8 : 0}>
+      {/* The header's controls, after the name. */}
+      <TitleBar>
         <View class="flex-1 flex-row items-center gap-2">
           <NavControls />
           <View class="flex-1" />

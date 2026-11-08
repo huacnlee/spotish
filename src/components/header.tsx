@@ -16,7 +16,7 @@ import { Account } from "./library/sidebar";
 import { closeMainWindow, hasAppWindow } from "../platform/desktop";
 import { sidebarCollapsed, toggleSidebar } from "../state/sidebar";
 import { ActionButton, IconButton, terminal } from "./ui/controls";
-import { titleBarArea } from "./ui/title-bar";
+import { controlsInTitleBar } from "./ui/title-bar";
 
 /** Log in while signed out; Premium for a free account; nothing
  * while the session is not known yet. */
@@ -100,12 +100,6 @@ function SearchBox(props: { onSearch: boolean; onDone: () => void }) {
   );
 }
 
-/** Whether the window's title bar holds the header's controls: on the
- * desktops where the app draws its own (macOS, Windows; tracked, it goes
- * in full screen). Elsewhere (Linux keeps the system's, the web, full
- * screen) each page's header has them. */
-export const controlsInTitleBar = () => layout() === "desktop" && titleBarArea().height > 0;
-
 /** Getting around: the account when the sidebar is folded away, the
  * sidebar's toggle, Back and Forward. */
 export function NavControls() {
@@ -113,8 +107,9 @@ export function NavControls() {
   return (
     <>
       {/* With the sidebar folded away, the account comes up here: the
-          user's picture, which opens the user menu. */}
-      <If when={desktop() && !terminal && !sidebarShown()}>
+          user's picture, which opens the user menu (the title bar has it at
+          its right end). */}
+      <If when={desktop() && !terminal && !sidebarShown() && !controlsInTitleBar()}>
         <Account compact placement="bottom" />
       </If>
       {/* Folds the sidebar away entirely, or brings it back. */}
@@ -136,7 +131,9 @@ export function NavControls() {
   );
 }
 
-/** The trailing controls: search and the account's action. */
+/** The trailing controls: search and the account's action, and in the
+ * title bar, with the sidebar folded away, the account itself, in the
+ * corner. */
 export function TrailingControls() {
   const desktop = () => layout() === "desktop";
   return (
@@ -145,6 +142,9 @@ export function TrailingControls() {
         <SearchField />
       </If>
       <AccountAction />
+      <If when={controlsInTitleBar() && !sidebarShown()}>
+        <Account compact placement="bottom" align="end" />
+      </If>
     </>
   );
 }
