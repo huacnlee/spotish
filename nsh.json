@@ -1,7 +1,7 @@
 {
   "name": "Spotish",
   "id": "dev.huacnlee.spotish",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "build": 1,
   "icon": "icon.png",
   "appearance": "system",
