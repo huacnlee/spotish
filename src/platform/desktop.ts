@@ -25,7 +25,7 @@
 // - macOS: the tray icon is a template image in the menu bar; Cmd+Q quits.
 // - Windows: the notification area.
 
-import { cleanup, effect, token } from "nsh";
+import { cleanup, effect, platform, token } from "nsh";
 import { Application, currentWindow, isAvailable, Tray, type WindowRef, windows } from "nsh/desktop";
 
 /** What the desktop shell needs from the player. */
@@ -119,6 +119,10 @@ export function installDesktopShell(opts: DesktopShellOptions): DesktopShell {
   if (!isAvailable) return NONE;
   const win = mainWindow();
   if (!win) return NONE;
+  // Linux keeps the system's title bar: nsh.json hides it for a bar of the
+  // app's own (`TitleBar`), which suits macOS and Windows, but a tiling
+  // desktop such as Omarchy's draws none, and the page header has Close.
+  if (platform.os === "linux") win.set({ titleBar: { style: "default" } });
 
   const showWindow = () => {
     win.show(); // Also restores it when minimized.

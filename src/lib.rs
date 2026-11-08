@@ -29,7 +29,7 @@ const IMAGE_MEMORY: usize = 32 << 20;
 /// The crate's UI set: what `App.tsx` imports from `spotish/native`.
 #[native_module("spotish/native")]
 fn native(registry: &mut Registry) {
-    // BENCH nsh_core::image::budget().set_limit(IMAGE_MEMORY.min(nsh_core::image::default_budget()));
+    nsh_core::image::budget().set_limit(IMAGE_MEMORY.min(nsh_core::image::default_budget()));
     registry
         .class::<Spotify>()
         .class::<MediaControls>()

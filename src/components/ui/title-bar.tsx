@@ -1,9 +1,9 @@
-// The window's title bar, drawn by the app. nsh.json hides the system's on
-// every desktop (`window.titleBar: { style: "hidden", height: 40 }`): one
-// bar runs across the top of the window, clear of the system's window
+// The window's title bar, drawn by the app. nsh.json hides the system's
+// (`window.titleBar: { style: "hidden", height: 40 }`), and Linux takes it
+// back (`installDesktopShell`): there the bar is 0 high and draws nothing.
+// One bar runs across the top of the window, clear of the system's window
 // controls (macOS's traffic lights at the left, centred in its 40 points;
-// Windows' caption buttons at the right; GTK's where the desktop puts them),
-// and shows the app's mark and name. The whole bar drags the window
+// Windows' caption buttons at the right), and shows the app's mark and name. The whole bar drags the window
 // (double-click maximizes). In full screen the platform reports no title
 // bar, and the bar goes. Nothing on the web, phones and terminals.
 
