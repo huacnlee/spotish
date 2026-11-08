@@ -5,6 +5,11 @@
   "build": 1,
   "appearance": "system",
   "theme": "theme.json",
+  "window": {
+    "titleBar": {
+      "style": "hidden"
+    }
+  },
   "rust": ".",
   "minRuntime": "0.4.0",
   "updater": {

@@ -8,14 +8,17 @@ import { SIDEBAR_WIDTH, Sidebar } from "../components/library/sidebar";
 import { PlayerBar } from "../components/player/player-bar";
 import { MainStack } from "./main";
 import { nowPlayingOpen } from "../state/overlays";
+import { TitleBar } from "../components/ui/title-bar";
 
 export function DesktopShell() {
   return (
     <View class="flex-1 flex-row gap-2 p-2">
       <View class="shrink-0" style={{ width: railSidebar() ? 72 : SIDEBAR_WIDTH }}>
+        <TitleBar side="left" />
         <Sidebar compact={railSidebar()} />
       </View>
       <View class="relative min-w-0 flex-1">
+        <TitleBar side="right" />
         <MainStack class="min-w-0 overflow-hidden" />
         {/* Not drawn under Now Playing: its glass reads what is behind it
             every frame, and there it would show nothing. */}

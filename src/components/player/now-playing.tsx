@@ -9,6 +9,7 @@ import { lightEffect } from "../../state/visual";
 import { LightMenu } from "./light-menu";
 import { Cover, IconButton } from "../ui/controls";
 import { AppSheet } from "../ui/overlays";
+import { titleBarArea } from "../ui/title-bar";
 import { MusicLight } from "../ui/toolbar-fx";
 import { enter } from "../ui/motion";
 import { LikeButton, NEW_COVER, NowPlayingSummary, SeekBar, TransportControls, VolumeControl } from "./parts";
@@ -63,7 +64,15 @@ function NowPlayingContent() {
     <View class="flex-1 bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {/* The music's light rises from the bottom of the page. */}
       <MusicLight effect={lightEffect()} colors={colors()} playing={player().playing} reach={windowSize().height * 0.45} />
-      <View class="z-10 flex-row items-center justify-between px-4 pt-4">
+      {/* The top row starts under the window controls (the band the
+          system's title bar had, which drags the window), its close button
+          under the traffic lights' left end: clear of them, hover
+          included, without a band of its own above it. */}
+      <View
+        class="z-10 flex-row items-center justify-between px-3"
+        desktop={{ windowDrag: true }}
+        style={{ paddingTop: titleBarArea().height > 0 ? titleBarArea().height : 16 }}
+      >
         <IconButton name="chevronDown" label="Close Now Playing" short="Back" size={24} onPress={() => setNowPlayingOpen(false)} />
         {/* The corner: the volume (always open here, nothing to reveal) and
             the light. */}
