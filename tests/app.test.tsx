@@ -62,6 +62,25 @@ test("Back, Forward and the library move through the stack", async () => {
   expect(app.enabled("role:button[Go forward]")).toBe(false);
 });
 
+test("the stack keeps the last few pages, so visiting many doesn't hold them all", async () => {
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  for (const page of ["Morning Static", "Late Trains", "Harbor Walk", "Liked Songs", "Paper Lanterns", "Neon Orchard"]) {
+    await app.press(`role:button[${page}]`);
+    await app.wait(100);
+  }
+  await app.waitFor("Neon Orchard");
+  // Past the push's slide, the oldest are let go: four pages over Home.
+  await app.wait(800);
+  for (const page of ["Paper Lanterns", "Liked Songs", "Harbor Walk"]) {
+    await app.press("role:button[Go back]");
+    await app.waitFor(`id:page-${page === "Liked Songs" ? "spotify:collection:tracks" : page === "Paper Lanterns" ? "spotify:album:paperlanterns" : "spotify:playlist:harborwalk"}`);
+  }
+  await app.press("role:button[Go back]");
+  await app.waitFor("Good evening, Ada");
+  expect(app.enabled("role:button[Go back]")).toBe(false);
+});
+
 test("a collection's track plays, and the player bar shows it", async () => {
   const app = await desktop({ premium: true });
   await app.waitFor("Good evening, Ada");
