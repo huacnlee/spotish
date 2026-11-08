@@ -230,3 +230,42 @@ test("the sidebar folds away and comes back", async () => {
   await app.press("role:button[Expand sidebar]");
   await app.waitFor("Liked Songs");
 });
+
+test("the lyrics follow the song, play from a line, and say when there are none", async () => {
+  const app = await desktop({ premium: true });
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[Paper Lanterns]");
+  await app.waitFor("role:button[Slow River, The Quiet Fields]");
+  await app.press("role:button[Slow River, The Quiet Fields]");
+  await app.waitFor("id:player >> role:button[Pause]");
+
+  // The bar's Lyrics opens Now Playing on them.
+  await app.press("id:player >> role:button[Lyrics]");
+  await app.waitFor("id:lyrics >> role:button[Paper boats along the river]");
+  expect(app.texts()).toContain("Lyrics provided by Demo");
+
+  // A line pressed plays from it (the demo's lines are 4 s apart), and is
+  // the line sung now.
+  await app.press("id:lyrics >> role:button[Carry me across the harbor]");
+  await app.waitFor("0:28");
+  expect(app.shows("id:lyric-now >> text:Carry me across the harbor")).toBe(true);
+  // The next starts on time.
+  await app.wait(4200);
+  expect(app.shows("id:lyric-now >> text:I will never be the same")).toBe(true);
+
+  // Hidden, they stay hidden until shown again.
+  await app.press("role:button[Hide lyrics]");
+  await app.waitFor("role:button[Show lyrics]");
+  expect(app.shows("id:lyrics")).toBe(false);
+  await app.press("role:button[Show lyrics]");
+
+  // Low Harbor's songs have none.
+  await app.press("role:button[Close Now Playing]");
+  await app.press("role:button[Go back]");
+  await app.press("role:button[Salt Lines, 2019 · Low Harbor]");
+  await app.waitFor("role:button[Breakwater, Low Harbor]");
+  await app.press("role:button[Breakwater, Low Harbor]");
+  await app.waitFor("id:player >> role:button[Pause]");
+  await app.press("id:player >> role:button[Lyrics]");
+  await app.waitFor("No lyrics for this song.");
+});
