@@ -6,6 +6,7 @@ import { store } from "../ui/store";
 import { Cover, SectionTitle } from "../ui/controls";
 import { Icon, type IconName } from "../ui/icons";
 import { clock, type Item, opens, type Track } from "../ui/types";
+import { enter } from "../ui/motion";
 
 function fallbackIcon(kind: string): IconName {
   if (kind === "artist") return "user";
@@ -26,7 +27,7 @@ export function Card(props: { item: Item }) {
     <Button
       accessibilityLabel={`${item().name} ${item().subtitle}`}
       onPress={() => activate(item())}
-      class="w-[180px] shrink-0 gap-2 rounded-(--radius-card) p-3 hover:bg-card active:opacity-80 focus:outline focus:outline-2 focus:outline-ring"
+      class="w-[180px] shrink-0 gap-2 rounded-(--radius-card) p-3 transition-transform duration-150 hover:scale-[1.03] hover:bg-card active:scale-[0.97] motion-reduce:transition-none motion-reduce:hover:scale-100 focus:outline focus:outline-2 focus:outline-ring"
     >
       <Cover src={() => item().image} round={item().kind === "artist"} fallback={fallbackIcon(item().kind)} />
       <View class="gap-1">
@@ -38,9 +39,9 @@ export function Card(props: { item: Item }) {
 }
 
 /** A titled row of cards that scrolls sideways. */
-export function CardRow(props: { title: string; items: Item[]; class?: string }) {
+export function CardRow(props: { title: string; items: Item[]; class?: string; delay?: number }) {
   return (
-    <View class={`gap-2 ${props.class ?? ""}`}>
+    <View class={`gap-2 ${props.class ?? ""}`} style={enter("fadeInUp", props.delay ?? 0)}>
       <SectionTitle class="px-3">{props.title}</SectionTitle>
       <Scroll horizontal scrollbar={false}>
         <View class="flex-row">

@@ -102,7 +102,7 @@ function LibraryPanel() {
           <If
             when={rail()}
             else={
-              <View class="m-2 gap-3 rounded-(--radius-card) bg-secondary p-4">
+              <View class="m-2 gap-3 rounded-(--radius-card) border border-border p-4">
                 <Text class="text-base font-bold text-foreground">Your playlists live here</Text>
                 <Text class="text-sm text-muted-foreground">
                   Log in with your Spotify account, free or Premium, to see your library and play music.

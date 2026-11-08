@@ -8,6 +8,7 @@ import { keymap } from "nsh";
 import { store } from "./src/ui/store";
 import { IconButton, PillButton } from "./src/ui/controls";
 import { Icon } from "./src/ui/icons";
+import { enter } from "./src/ui/motion";
 import { Home } from "./src/screens/home";
 import { Search } from "./src/screens/search";
 import { Collection } from "./src/screens/collection";
@@ -22,10 +23,12 @@ const phone = () => !platform.desktop || windowSize().width < NARROW;
 function CurrentScreen() {
   return (
     <View class="min-h-0 flex-1">
-      <If when={store.route().name === "home"}><Home /></If>
-      <If when={store.route().name === "search"}><Search /></If>
+      <If when={store.route().name === "home"}><View class="flex-1" style={enter("fadeIn")}><Home /></View></If>
+      <If when={store.route().name === "search"}><View class="flex-1" style={enter("fadeIn")}><Search /></View></If>
       <If when={store.route().name === "collection"}>
-        <Collection uri={(store.route() as { uri: string }).uri} />
+        <View class="flex-1" style={enter("fadeIn")}>
+          <Collection uri={(store.route() as { uri: string }).uri} />
+        </View>
       </If>
     </View>
   );

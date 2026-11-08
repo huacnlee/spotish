@@ -41,7 +41,7 @@
       "foreground": "#ffffff",
       "card": "#181818",
       "card-foreground": "var(--foreground)",
-      "popover": "#282828",
+      "popover": "#1c1c1c",
       "popover-foreground": "var(--foreground)",
       "primary": "#1ed760",
       "primary-foreground": "#000000",

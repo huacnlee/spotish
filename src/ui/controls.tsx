@@ -22,7 +22,7 @@ export function IconButton(props: {
       accessibilityLabel={props.label}
       disabled={props.disabled?.() ?? false}
       onPress={props.onPress}
-      class="items-center justify-center rounded-full hover:opacity-85 active:opacity-60 active:scale-95 disabled:opacity-35 focus:outline focus:outline-2 focus:outline-ring"
+      class="items-center justify-center rounded-full transition-transform duration-150 hover:opacity-85 active:opacity-60 active:scale-95 disabled:opacity-35 motion-reduce:transition-none focus:outline focus:outline-2 focus:outline-ring"
       style={{ width: size() + 12, height: size() + 12 }}
     >
       <Icon name={props.name()} size={size()} color={color()} />
@@ -45,7 +45,7 @@ export function PlayButton(props: {
       accessibilityLabel={props.playing() ? "Pause" : "Play"}
       disabled={props.disabled?.() ?? false}
       onPress={props.onPress}
-      class={`items-center justify-center rounded-full hover:scale-105 active:scale-95 active:opacity-85 disabled:opacity-40 focus:outline focus:outline-2 focus:outline-ring ${primary() ? "bg-primary" : "bg-control"}`}
+      class={`items-center justify-center rounded-full transition-transform duration-150 hover:scale-105 active:scale-95 active:opacity-85 disabled:opacity-40 motion-reduce:transition-none motion-reduce:hover:scale-100 focus:outline focus:outline-2 focus:outline-ring ${primary() ? "bg-primary" : "bg-control"}`}
       style={{ width: size(), height: size() }}
     >
       <Icon
