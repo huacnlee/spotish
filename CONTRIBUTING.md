@@ -29,18 +29,19 @@ demand play, skips) will not be merged. Point listeners to Spotify Premium inste
 
 ### How Spotish depends on NSH
 
-`Cargo.toml` takes NSH's crates from Git, pinned to one commit:
+`Cargo.toml` takes NSH's crates from Git, from its `main` branch:
 
 ```toml
-nsh-core = { git = "https://github.com/longbridge/nsh", rev = "<commit>" }
+nsh-core = { git = "https://github.com/longbridge/nsh", branch = "main" }
 ```
 
-The `nsh` CLI generates its hosts from the same Git checkout Cargo resolved, so the app and its hosts share one
-`nsh-core`. The pinned `rev` must be the commit your CLI was built from (the hash `nsh --version` prints): the code the
-CLI generates calls that commit's API. The `nightly` tag moves with NSH's `main`; to follow it, reinstall the CLI,
-set `rev` in every `nsh-*` line of `Cargo.toml` to the commit `nsh --version` prints (the full hash is
-`git ls-remote https://github.com/longbridge/nsh refs/tags/nightly`), and run `nsh check` and `nsh test`. CI warns
-when the nightly CLI and the pinned `rev` differ.
+`Cargo.lock` holds the commit. The `nsh` CLI generates its hosts from the same Git checkout Cargo resolved, so the app
+and its hosts share one `nsh-core`. The locked commit must be the one your CLI was built from (the hash
+`nsh --version` prints): the code the CLI generates calls that commit's API. The `nightly` tag moves with NSH's
+`main`; to follow it, reinstall the CLI, run `cargo update -p nsh-core` (it takes `main`'s latest commit, so do it
+soon after the nightly is published; `cargo update -p nsh-core --precise <hash>` takes the exact commit
+`git ls-remote https://github.com/longbridge/nsh refs/tags/nightly` prints), and run `nsh check` and `nsh test`. CI
+warns when the nightly CLI and the locked commit differ.
 
 To work against a local NSH checkout instead (for example while changing NSH itself), point the `nsh-*` lines at it
 with `path = "../nsh/crates/nsh-core"` (and so on) and use a CLI built from that checkout. Do not commit that change:

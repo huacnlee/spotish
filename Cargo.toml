@@ -10,10 +10,11 @@ publish = false
 # The app's UI set (a library the CLI links into its generated hosts).
 
 [dependencies]
-# NSH nightly, pinned to the commit the `nsh` CLI was built from (`nsh --version`
-# prints it). The CLI builds its hosts from the same Git checkout; raise `rev`
-# together with the CLI. See CONTRIBUTING.md.
-nsh-core = { git = "https://github.com/longbridge/nsh", rev = "f81b965f69096f871ca21907f6fab6be32fd2d40" }
+# NSH's main branch, at the commit Cargo.lock holds: the one the `nsh` CLI was
+# built from (`nsh --version` prints it). The CLI builds its hosts from the same
+# Git checkout; move the lock with `cargo update -p nsh-core` together with the
+# CLI. See CONTRIBUTING.md.
+nsh-core = { git = "https://github.com/longbridge/nsh", branch = "main" }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -40,5 +41,5 @@ rustfft = "6"
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_System_Threading"] }
 
 [dev-dependencies]
-nsh-engine = { git = "https://github.com/longbridge/nsh", rev = "f81b965f69096f871ca21907f6fab6be32fd2d40" }
-nsh-testing = { git = "https://github.com/longbridge/nsh", rev = "f81b965f69096f871ca21907f6fab6be32fd2d40" }
+nsh-engine = { git = "https://github.com/longbridge/nsh", branch = "main" }
+nsh-testing = { git = "https://github.com/longbridge/nsh", branch = "main" }
