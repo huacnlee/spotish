@@ -124,7 +124,7 @@ export interface IconButtonProps {
   short?: string;
   /** Points (default 18). */
   size?: number;
-  /** A toggle that is on: drawn in the primary color, with a dot. */
+  /** A toggle that is on: drawn in the primary color, on a soft disc of it. */
   pressed?: boolean;
   /** The color while `pressed`, instead of the primary color and the dot
    * (Liked's red heart). */
@@ -159,6 +159,8 @@ export function IconButton(props: IconButtonProps) {
     );
   }
   const color = (): IconColor => (props.pressed ? (props.pressedColor ?? "primary") : "foreground");
+  // On, with the primary's look (not a colour of its own, as Liked's heart).
+  const on = () => (props.pressed ?? false) && !props.pressedColor;
   const hover = iconMotion();
   return (
     <View onMouseEnter={() => !props.disabled && hover.play(props.name)}>
@@ -173,8 +175,14 @@ export function IconButton(props: IconButtonProps) {
       style={{ width: size() + 16, height: size() + 16 }}
     >
       {/* Layer 1: a translucent disc that settles in under the pointer and
-          deepens as it presses: whatever is behind shows through. */}
-      <View class={`absolute inset-0 rounded-full bg-foreground/10 opacity-0 scale-[${SCALE.enter}] ${PRESS} group-hover:scale-100 group-hover:opacity-100 group-active:scale-[${SCALE.press}] group-active:bg-foreground/15 group-disabled:opacity-0`} />
+          deepens as it presses: whatever is behind shows through. A toggle
+          that is on keeps it, in its own colour. */}
+      <View
+        class={`absolute inset-0 rounded-full ${PRESS} group-active:scale-[${SCALE.press}] ${
+          on() ? "bg-primary/15 opacity-100 scale-100" : `bg-foreground/10 opacity-0 scale-[${SCALE.enter}] group-hover:scale-100 group-hover:opacity-100 group-active:bg-foreground/15 group-disabled:opacity-0`
+        }`}
+        style={on() && props.tinted ? { backgroundColor: alpha(tint(), 0.18) } : undefined}
+      />
       {/* Layer 2: the glyph brightens (its drawing morphs, `iconMotion`), then
           sinks as it presses; a new glyph swaps in (`SwapIcon`). */}
       <View
@@ -186,9 +194,6 @@ export function IconButton(props: IconButtonProps) {
           <SwapIcon name={props.name} t={hover.t()} size={size()} color={color()} hex={props.pressed && props.tinted && !props.pressedColor ? alpha(tint(), 0.95) : undefined} />
         </View>
       </View>
-      <If when={(props.pressed ?? false) && !props.pressedColor}>
-        <View class="absolute bottom-0.5 size-1 rounded-full bg-primary" style={props.tinted ? { backgroundColor: alpha(tint(), 0.95) } : undefined} />
-      </If>
     </Button>
     </View>
   );
