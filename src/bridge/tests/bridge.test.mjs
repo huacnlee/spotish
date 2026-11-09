@@ -464,6 +464,43 @@ test("playContext waits for the new page and plays the row linking the track", a
   assert.equal(win.location.pathname, "/playlist/new");
 });
 
+test("playContext plays a podcast from its newest episode", async () => {
+  const page = playerPage();
+  const win = fakeWindow(page.body);
+  let newest;
+  let older;
+  win.onDispatch = () => {
+    // A show's page: an action bar with no play button, then its episodes.
+    setTimeout(() => {
+      const episode = (i) => {
+        const button = h("button", { "data-testid": "play-button", "aria-label": "Play EP" + i });
+        button.onclick = () => button.setAttribute("aria-label", "Pause EP" + i);
+        return { row: h("div", { "data-testid": "episode-" + i }, button), button };
+      };
+      newest = episode(0);
+      older = episode(1);
+      page.body.append(
+        h(
+          "main",
+          {},
+          h("div", { "data-testid": "action-bar-row" }, h("button", { "data-testid": "more-button" })),
+          h("div", { "data-testid": "show-all-episode-list" }, newest.row, older.row),
+        ),
+      );
+    }, 5);
+  };
+  const opts = options(win);
+  opts.sleep = (ms) => {
+    win.clock.t += ms;
+    return new Promise((r) => setTimeout(r, 1));
+  };
+  const bridge = B.install(win, opts);
+  assert.deepEqual(await bridge.playContext("spotify:show:pod", null), { confirmed: true });
+  assert.equal(win.location.pathname, "/show/pod");
+  assert.equal(newest.button.clicks, 1);
+  assert.equal(older.button.clicks, 0);
+});
+
 test("playTrack on the playing track does not pause it", async () => {
   const page = playerPage(); // its bar plays spotify:track:abc123
   const { win, bridge } = bridgeFor(page);
