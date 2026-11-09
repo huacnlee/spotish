@@ -36,6 +36,38 @@ function repeatButton() {
   };
   return b;
 }
+// The widget's like button: on a track not liked it adds it; on a liked one
+// it opens an "Add to playlist" picker (appended to `body`), where Liked
+// Songs is unchecked and Done applies it.
+function likeButton(body) {
+  const b = h("button", { "aria-checked": "false", "aria-label": "Add to Liked Songs" });
+  const set = (on) => {
+    b.setAttribute("aria-checked", on ? "true" : "false");
+    b.setAttribute("aria-label", on ? "Add to playlist" : "Add to Liked Songs");
+  };
+  b.onclick = () => {
+    if (b.getAttribute("aria-checked") !== "true") return set(true);
+    const choice = h(
+      "button",
+      { role: "menuitemcheckbox", "aria-checked": "true" },
+      h("div", { role: "group", "aria-labelledby": "listrow-title-spotify:collection:tracks" }),
+    );
+    choice.onclick = () => choice.setAttribute("aria-checked", choice.getAttribute("aria-checked") === "true" ? "false" : "true");
+    const cancel = h("button", {});
+    cancel.textContent = "Cancel";
+    const done = h("button", {});
+    done.textContent = "Done";
+    const picker = h("div", { role: "dialog" }, h("div", {}, choice), h("div", {}, cancel, done));
+    const close = () => picker.remove();
+    cancel.onclick = close;
+    done.onclick = () => {
+      set(choice.getAttribute("aria-checked") === "true");
+      close();
+    };
+    body().append(picker);
+  };
+  return b;
+}
 function range(testid, attrs, value) {
   const input = h("input", Object.assign({ type: "range" }, attrs));
   input.value = String(value);
@@ -50,10 +82,10 @@ function playerPage({ ad = false } = {}) {
   mute.onclick = () => mute.setAttribute("aria-label", mute.getAttribute("aria-label") === "Mute" ? "Unmute" : "Mute");
   const widget = h(
     "div",
-    { "data-testid": "now-playing-widget" },
+    { "data-testid": "now-playing-widget-v2" },
     h("div", { "data-testid": "context-item-info-title" }, h("a", { href: "/track/abc123" })),
     h("a", { href: "/playlist/pl1" }),
-    toggleButton("add-button"),
+    likeButton(() => body),
     ad ? h("div", { "data-testid": "context-item-info-ad-subtitle" }) : [],
   );
   widget.querySelector('[data-testid="context-item-info-title"] a').textContent = "Song";
@@ -329,6 +361,12 @@ test("setters settle against the page and ranges read back on their step", async
   assert.equal(await bridge.setMuted(true), true);
   assert.equal(await bridge.setMuted(true), true);
   assert.equal(page.mute.clicks, 1);
+  assert.equal(await bridge.setLiked(true), true);
+  assert.equal(await bridge.setLiked(true), true);
+  assert.equal(page.like.clicks, 1);
+  assert.equal(await bridge.setLiked(false), false, "unliked through the picker");
+  assert.equal(page.like.getAttribute("aria-checked"), "false");
+  assert.equal(page.body.querySelector('[role="dialog"]'), null, "the picker closed");
   assert.equal(await bridge.setLiked(true), true);
   assert.equal(await bridge.play(), true);
   assert.equal(await bridge.play(), true);

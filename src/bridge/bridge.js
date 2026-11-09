@@ -37,7 +37,7 @@
   "use strict";
 
   const PROTOCOL = 1;
-  const REVISION = 6;
+  const REVISION = 7;
   // Liked Songs' cover: the library reports it; the tracks query does not.
   const LIKED_IMAGE = "https://misc.scdn.co/liked-songs/liked-songs-640.png";
   let likedImage = "";
@@ -56,10 +56,14 @@
     duration: '[data-testid="playback-duration"]',
     volume: '[data-testid="volume-bar"] input[type="range"]',
     mute: '[data-testid="volume-bar-toggle-mute-button"]',
-    like: '[data-testid="now-playing-widget"] button[aria-checked]',
+    // The widget's test id has a version suffix (`now-playing-widget-v2`).
+    like: '[data-testid^="now-playing-widget"] button[aria-checked]',
+    // A liked track's button opens an "Add to playlist" picker; Liked Songs
+    // is a checkbox item of it.
+    likedChoice: '[role="menuitemcheckbox"] [aria-labelledby$="spotify:collection:tracks"]',
     title: '[data-testid="context-item-info-title"] a, [data-testid="context-item-link"]',
     context:
-      '[data-testid="now-playing-widget"] a[href*="/playlist/"], [data-testid="now-playing-widget"] a[href*="/album/"], [data-testid="now-playing-widget"] a[href*="/artist/"], [data-testid="now-playing-widget"] a[href*="/collection/"]',
+      '[data-testid^="now-playing-widget"] a[href*="/playlist/"], [data-testid^="now-playing-widget"] a[href*="/album/"], [data-testid^="now-playing-widget"] a[href*="/artist/"], [data-testid^="now-playing-widget"] a[href*="/collection/"]',
     adMarker: '[data-testid="context-item-info-ad-subtitle"], [data-testid="ad-link"], [data-testid="ad-type-indicator"]',
     login: '[data-testid="login-button"]',
     topBar: '[data-testid="top-bar"], [data-testid="topbar"], [data-testid="global-nav-bar"], #global-nav-bar',
@@ -936,6 +940,18 @@
       const like = inBar(SEL.like);
       return !!like && like.getAttribute("aria-checked") === "true";
     };
+    // The picker's Liked Songs item, while the picker is open.
+    const likedChoice = () => {
+      const label = q(SEL.likedChoice);
+      return label ? label.closest('[role="menuitemcheckbox"]') : null;
+    };
+    // The picker's Done button: the nearest one around its Liked Songs item.
+    const pickerDone = (choice) => {
+      for (let el = choice.parentNode; el && el.querySelectorAll; el = el.parentNode) {
+        for (const b of el.querySelectorAll("button")) if (/^\s*done\s*$/i.test(b.textContent || "")) return b;
+      }
+      return null;
+    };
     const readShuffle = () => {
       const el = inBar(SEL.shuffle);
       return !!el && el.getAttribute("aria-checked") === "true";
@@ -1165,9 +1181,22 @@
         if (!/^(off|context|track)$/.test(mode)) throw fail("E_BAD_ARGS", "repeat " + mode);
         return settle(settleOpts("repeat", () => readRepeat(inBar(SEL.repeat)), mode, SEL.repeat, 3));
       },
+      // The like button adds a track to Liked Songs. On a liked track it
+      // opens the "Add to playlist" picker instead: Liked Songs is unchecked
+      // there and the picker closed with Done.
       setLiked: async (on) => {
         refuseDuringAd("setLiked");
-        return settle(settleOpts("liked", readLiked, !!on, SEL.like, 2));
+        const target = !!on;
+        if (readLiked() === target) return target;
+        press("like", SEL.like);
+        const choice = await waitFor(() => (readLiked() === target ? "settled" : likedChoice()), 2000, 50);
+        if (choice && choice !== "settled") {
+          if ((choice.getAttribute("aria-checked") === "true") !== target) choice.click();
+          const done = await waitFor(() => pickerDone(choice), 2000, 50);
+          usable("like picker's Done", done).click();
+        }
+        if (!(await waitFor(() => readLiked() === target, 3000, 50))) throw fail("E_TIMEOUT", "liked did not change to " + target);
+        return target;
       },
       setMuted: (on) => settle(settleOpts("muted", readMuted, !!on, SEL.mute, 2)),
 
