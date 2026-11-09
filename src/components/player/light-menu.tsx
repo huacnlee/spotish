@@ -1,4 +1,4 @@
-// The music light's menu: Random first (another effect for each track),
+// The music light's menu, opened at the effect in use: Random first (another effect for each track),
 // set apart by a line, then the effects, numbered, one line each, the one in use checked (a
 // check on the right; under Random, the one it picked carries a faint
 // shuffle mark instead); the list scrolls when it is taller than the room. Its trigger
@@ -14,11 +14,22 @@ import { Icon, iconMotion } from "../ui/icons";
 import { menuPopupHidden, menuPopupLeaving, menuPopupStyle } from "../ui/menu";
 import { EFFECT_NAMES, TOOLBAR_EFFECTS, type ToolbarEffect } from "../ui/toolbar-fx";
 
+// A row's height (`menuItem`'s h-8) and the list's (`max-h-72`).
+const ROW = 32;
+const VIEW = 288;
+
 export function LightMenu(props: { placement: "top" | "bottom"; size?: number }) {
   const open = signal(false);
   const hover = iconMotion();
   const size = () => props.size ?? 18;
   const label = () => `Light: ${lightName()}`;
+  // The effects' list: rows of ROW points in a window of VIEW. Where it
+  // starts, so the effect in use is in the middle of it.
+  const openAt = () => {
+    const i = TOOLBAR_EFFECTS.indexOf(lightEffect());
+    const most = Math.max(0, TOOLBAR_EFFECTS.length * ROW - VIEW);
+    return Math.min(most, Math.max(0, i * ROW - (VIEW - ROW) / 2));
+  };
   return (
     <Menu
       open={open()}
@@ -64,9 +75,6 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
         </Button>
       }
     >
-      <If when={!terminal}>
-        <Text class="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Music light</Text>
-      </If>
       <MenuItem
         role="menuitemradio"
         checked={lightRandom()}
@@ -88,7 +96,10 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
       {/* Random apart from the effects, above a line; the effects scroll
           under it when they are taller than the window allows. */}
       <MenuSeparator class={terminal ? "hidden" : "-mx-1 my-1 h-px bg-border"} />
-      <Scroll class="max-h-72">
+      {/* Opened where the effect in use is, in the middle when it can be
+          (the rows are made afresh on each opening, so this is where each
+          opening starts). */}
+      <Scroll class="max-h-72" contentOffset={{ y: terminal ? 0 : openAt() }}>
       <Each of={TOOLBAR_EFFECTS} key={(e) => e}>
         {(effect) => (
           <MenuItem
