@@ -1,13 +1,14 @@
-// The music light's menu: the effects, numbered, one line each, the one in
-// use checked (a check on the right); the list scrolls when it is taller
-// than the room. Its trigger
+// The music light's menu: Random first (another effect for each track),
+// then the effects, numbered, one line each, the one in use checked (a
+// check on the right; under Random, the one it picked carries a faint
+// shuffle mark instead); the list scrolls when it is taller than the room. Its trigger
 // is an icon button (the player bar's, Now Playing's); choosing an effect
 // changes both, and is remembered (`state/visual`).
 
 import { Scroll, signal, Text, View } from "nsh";
 import { Button, Menu, MenuItem } from "nsh/base";
 import { regionItem } from "../ui/regions";
-import { lightEffect, lightName, setLight } from "../../state/visual";
+import { lightEffect, lightName, lightRandom, setLight } from "../../state/visual";
 import { focusRing, Hint, LAYER, menuItem, popupSurface, terminal } from "../ui/controls";
 import { Icon, iconMotion } from "../ui/icons";
 import { menuPopupHidden, menuPopupLeaving, menuPopupStyle } from "../ui/menu";
@@ -68,11 +69,29 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
       </If>
       {/* Taller than the window allows: the rows scroll under the title. */}
       <Scroll class="max-h-72">
+      <MenuItem
+        role="menuitemradio"
+        checked={lightRandom()}
+        onSelect={() => setLight("random")}
+        class={terminal ? "px-1 focus:bg-muted" : `group ${menuItem} gap-2.5`}
+        indicatorClass={terminal ? undefined : "hidden"}
+      >
+        {/* In the numbers' column: a shuffle mark, as wide as two digits. */}
+        <If when={!terminal}>
+          <View class="w-[15px] items-start">
+            <Icon name="shuffle" size={12} color="muted-foreground" />
+          </View>
+        </If>
+        <Text class="line-clamp-1 flex-1 text-sm text-popover-foreground group-checked:font-semibold">Random</Text>
+        <If when={!terminal && lightRandom()}>
+          <Icon name="check" size={12} color="foreground" />
+        </If>
+      </MenuItem>
       <Each of={TOOLBAR_EFFECTS} key={(e) => e}>
         {(effect) => (
           <MenuItem
             role="menuitemradio"
-            checked={lightEffect() === effect()}
+            checked={!lightRandom() && lightEffect() === effect()}
             onSelect={() => setLight(effect())}
             class={terminal ? "px-1 focus:bg-muted" : `group ${menuItem} gap-2.5`}
             indicatorClass={terminal ? undefined : "hidden"}
@@ -82,8 +101,12 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
             <Text class="font-mono text-xs tabular-nums text-muted-foreground">{String(TOOLBAR_EFFECTS.indexOf(effect()) + 1).padStart(2, "0")}</Text>
             <Text class="line-clamp-1 flex-1 text-sm text-popover-foreground group-checked:font-semibold">{EFFECT_NAMES[effect()]}</Text>
             {/* The one in use: a check on the right. */}
-            <If when={!terminal && lightEffect() === effect()}>
+            <If when={!terminal && !lightRandom() && lightEffect() === effect()}>
               <Icon name="check" size={12} color="foreground" />
+            </If>
+            {/* Random's pick for this track. */}
+            <If when={!terminal && lightRandom() && lightEffect() === effect()}>
+              <Icon name="shuffle" size={12} color="muted-foreground" />
             </If>
           </MenuItem>
         )}
