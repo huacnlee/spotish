@@ -11,6 +11,7 @@ import { TrackHeader, TrackRow } from "../components/library/tracks";
 import { SectionTitle, terminal } from "../components/ui/controls";
 import { EmptyState, ErrorState, Reveal, SearchSkeleton, Spinner } from "../components/ui/feedback";
 import { createListWave } from "../components/ui/motion";
+import { createListGroup, createListKeys } from "../components/ui/list-keys";
 import { currentRoute, rootOpens } from "../nav";
 import { Icon } from "../components/ui/icons";
 import { backend } from "../state/engine";
@@ -41,7 +42,7 @@ export function SearchPage() {
   const shown = () => (term() ? results()?.found : undefined);
 
   return (
-    <AppPage title="Search" testID="page-search">
+    <AppPage title="Search" testID="page-search" shown={() => currentRoute().name === "search"}>
       {/* On the desktop the field is in the header's top-right corner
           (`SearchField`); the phone and the terminal keep it here. */}
       <If when={layout() !== "desktop" || terminal}>
@@ -94,6 +95,18 @@ export function SearchPage() {
                 found();
                 untracked(() => wave.restart());
               });
+              // The results are one region: one stop of Tab, the arrows
+              // going down the songs and on into the rows of cards.
+              const group = createListGroup({ region: "main", when: () => currentRoute().name === "search" });
+              const songs = createListKeys({
+                count: () => found().tracks.length,
+                group,
+                order: () => 0,
+                activate: (i) => {
+                  const track = found().tracks[i];
+                  if (track && ready()) playTrack(track);
+                },
+              });
               return (
               <If when={!isEmpty(found())} else={<EmptyState title="No results" detail="Check the spelling, or try fewer words." />}>
                 <View class={terminal ? "gap-1" : "gap-8"}>
@@ -101,6 +114,7 @@ export function SearchPage() {
                     <View class="gap-2">
                       <SectionTitle class="px-6">Songs</SectionTitle>
                       <TrackHeader showAlbum={wideTracks()} />
+                      <View ref={songs.ref} focusable={songs.focusable()} onFocus={songs.onFocus} onBlur={songs.onBlur}>
                       <Each of={found().tracks} key={(t) => t.uid || t.uri}>
                         {(track, i) => (
                           <TrackRow
@@ -109,20 +123,22 @@ export function SearchPage() {
                             showAlbum={wideTracks()}
                             disabled={!ready()}
                             wave={wave}
+                            keys={songs}
                             onPress={() => playTrack(track())}
                           />
                         )}
                       </Each>
+                      </View>
                     </View>
                   </If>
                   <If when={found().artists.length > 0}>
-                    <CardRow title="Artists" items={found().artists} wave={wave} class="px-3" />
+                    <CardRow title="Artists" items={found().artists} wave={wave} class="px-3" group={group} order={1} />
                   </If>
                   <If when={found().albums.length > 0}>
-                    <CardRow title="Albums" items={found().albums} wave={wave} delay={120} class="px-3" />
+                    <CardRow title="Albums" items={found().albums} wave={wave} delay={120} class="px-3" group={group} order={2} />
                   </If>
                   <If when={found().playlists.length > 0}>
-                    <CardRow title="Playlists" items={found().playlists} wave={wave} delay={240} class="px-3" />
+                    <CardRow title="Playlists" items={found().playlists} wave={wave} delay={240} class="px-3" group={group} order={3} />
                   </If>
                 </View>
               </If>

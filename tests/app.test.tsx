@@ -269,3 +269,29 @@ test("the lyrics follow the song, play from a line, and say when there are none"
   await app.press("id:player >> role:button[Lyrics]");
   await app.waitFor("No lyrics for this song.");
 });
+
+test("? shows the keyboard shortcuts", async () => {
+  const app = await desktop({ premium: true });
+  await app.waitFor("Good evening, Ada");
+  await app.keyboard.press("shift+/");
+  await app.waitFor("id:shortcuts");
+  expect(app.texts()).toContain("Keyboard Shortcuts");
+  expect(app.texts()).toContain("Go to the sidebar");
+});
+
+test("Ctrl and the arrows move between regions; the arrows and Return work inside them", async () => {
+  const app = await desktop({ premium: true });
+  await app.waitFor("Good evening, Ada");
+  // The sidebar: Home, then on down into the library, whose first entry is
+  // Liked Songs.
+  await app.keyboard.press("ctrl+left");
+  await app.keyboard.press("down");
+  await app.keyboard.press("enter");
+  await app.waitFor("role:header[Liked Songs]");
+  // The page: its play button first, then down into its tracks; Return
+  // plays the first.
+  await app.keyboard.press("ctrl+right");
+  await app.keyboard.press("down");
+  await app.keyboard.press("enter");
+  await app.waitFor("id:player >> role:button[Pause]");
+});
