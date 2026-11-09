@@ -18,6 +18,27 @@ the catalogue, your library and Spotify's ads all work exactly as Spotify intend
 > **Spotish never blocks or skips Spotify's ads.** [Spotify Premium](https://www.spotify.com/premium/) is how you
 > remove them, play any track on demand, and support the artists you listen to.
 
+## Install
+
+**macOS / Linux** — run in Terminal:
+
+```sh
+curl -fsSL https://huacnlee.github.io/spotish/install.sh | bash
+```
+
+**Windows** — run in PowerShell:
+
+```powershell
+irm https://huacnlee.github.io/spotish/install.ps1 | iex
+```
+
+The installer downloads the latest release and verifies its checksum. Run the same command to update.
+You can also [download a release](https://github.com/huacnlee/spotish/releases/latest) manually.
+
+Supported builds: Apple silicon with macOS 14 or later, x86_64 Linux with GTK 4.14 and glibc 2.39 or later
+(such as Ubuntu 24.04), and x86_64 Windows. Playback requires a [supported browser and a Spotify account](#requirements).
+On macOS, the app is not notarized; the first launch may need approval in **System Settings → Privacy & Security**.
+
 ## What is NSH?
 
 [NSH (Native Shell)](https://nsh.dev) is a Rust UI framework that renders one app through each platform's own native
