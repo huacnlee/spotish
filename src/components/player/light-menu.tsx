@@ -1,12 +1,12 @@
 // The music light's menu: Random first (another effect for each track),
-// then the effects, numbered, one line each, the one in use checked (a
+// set apart by a line, then the effects, numbered, one line each, the one in use checked (a
 // check on the right; under Random, the one it picked carries a faint
 // shuffle mark instead); the list scrolls when it is taller than the room. Its trigger
 // is an icon button (the player bar's, Now Playing's); choosing an effect
 // changes both, and is remembered (`state/visual`).
 
 import { Scroll, signal, Text, View } from "nsh";
-import { Button, Menu, MenuItem } from "nsh/base";
+import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import { regionItem } from "../ui/regions";
 import { lightEffect, lightName, lightRandom, setLight } from "../../state/visual";
 import { focusRing, Hint, LAYER, menuItem, popupSurface, terminal } from "../ui/controls";
@@ -67,8 +67,6 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
       <If when={!terminal}>
         <Text class="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Music light</Text>
       </If>
-      {/* Taller than the window allows: the rows scroll under the title. */}
-      <Scroll class="max-h-72">
       <MenuItem
         role="menuitemradio"
         checked={lightRandom()}
@@ -87,6 +85,10 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
           <Icon name="check" size={12} color="foreground" />
         </If>
       </MenuItem>
+      {/* Random apart from the effects, above a line; the effects scroll
+          under it when they are taller than the window allows. */}
+      <MenuSeparator class={terminal ? "hidden" : "-mx-1 my-1 h-px bg-border"} />
+      <Scroll class="max-h-72">
       <Each of={TOOLBAR_EFFECTS} key={(e) => e}>
         {(effect) => (
           <MenuItem
