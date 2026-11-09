@@ -6,6 +6,7 @@
 
 import { Scroll, signal, Text, View } from "nsh";
 import { Button, Menu, MenuItem } from "nsh/base";
+import { regionItem } from "../ui/regions";
 import { lightEffect, lightName, setLight } from "../../state/visual";
 import { focusRing, Hint, LAYER, menuItem, popupSurface, terminal } from "../ui/controls";
 import { Icon, iconMotion } from "../ui/icons";
@@ -30,6 +31,7 @@ export function LightMenu(props: { placement: "top" | "bottom"; size?: number })
       popupEndingStyle={menuPopupLeaving(props.placement, "end")}
       trigger={
         <Button
+          ref={regionItem()}
           accessibilityLabel={label()}
           selected={open()}
           tooltip={open() ? undefined : <Hint label={label()} />}

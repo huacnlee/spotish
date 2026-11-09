@@ -4,10 +4,10 @@
 
 import { Digits } from "../ui/digits";
 import { Text, untracked, View } from "nsh";
-import { Button } from "nsh/base";
 import { clock, type Track } from "../../backend/types";
 import { isCurrentTrack, isPlaying } from "../../state/player";
-import { Cover, LAYER, focusRing, terminal } from "../ui/controls";
+import { Cover, LAYER, focusRing, keyRing, Pressable, terminal } from "../ui/controls";
+import type { ListKeys } from "../ui/list-keys";
 import { PlayingBars } from "../ui/playing";
 import { Icon } from "../ui/icons";
 import { listItemEntrance, type ListWave, WAVE } from "../ui/motion";
@@ -45,11 +45,14 @@ export function TrackRow(props: {
   /** The list's wave: the row comes in with it each time the page is
    * entered, and on its own when it is scrolled into view. */
   wave?: ListWave;
+  /** Its list's keyboard: the row is no stop of Tab then, and shows the
+   * list's highlight. */
+  keys?: ListKeys;
   onPress: () => void;
 }) {
   // The row slides in from the right, its cover flips open and its words
   // slide in after it, each on a timeline of its own, once per track per
-  // entry. Made here, once, and bound as plain values: the Button
+  // entry. Made here, once, and bound as plain values: the row
   // re-reads its style whenever any of its props changes (`selected` follows
   // every player update), and a motion made in that binding would play
   // again each time.
@@ -65,17 +68,22 @@ export function TrackRow(props: {
   const current = () => isCurrentTrack(props.track?.uri ?? "");
   const playing = () => current() && isPlaying();
   const label = () => (props.track ? `${props.track.name}, ${props.track.artists}` : "");
+  const keyed = () => props.keys?.isActive(props.number) ?? false;
   return (
-    <Button
+    <Pressable
+      focusable={!props.keys}
       accessibilityLabel={label()}
       selected={current()}
       disabled={props.disabled ?? false}
-      onPress={props.onPress}
-      class={
+      onPress={() => {
+        props.keys?.pressed(props.number);
+        props.onPress();
+      }}
+      class={`${
         terminal
           ? "flex-row gap-2 px-1 focus:bg-muted selected:bg-muted"
           : `group mx-3 h-12 flex-row items-center gap-3 rounded-(--radius) px-3 transition duration-150 ease-out hover:bg-row-hover active:bg-muted selected:bg-row-hover disabled:opacity-50 motion-reduce:transition-none ${focusRing}`
-      }
+      } ${keyed() ? keyRing : ""}`}
       classList={{ "opacity-45": !!props.track && !props.track.playable }}
       style={entrance}
     >
@@ -120,6 +128,6 @@ export function TrackRow(props: {
         <Text class="line-clamp-1 min-w-0 flex-1 text-xs text-muted-foreground">{props.track?.album ?? ""}</Text>
       </If>
       <Digits class="w-12 text-right text-xs text-muted-foreground">{props.track ? clock(props.track.durationMs) : ""}</Digits>
-    </Button>
+    </Pressable>
   );
 }

@@ -5,12 +5,13 @@
 // short text label, and covers take no Cells.
 
 import { type AnimatedValue, effect, Image, platform, type MotionSpec, reduceMotion, signal, Text, token, untracked, View } from "nsh";
-import type { JSX } from "nsh";
+import type { JSX, ViewProps } from "nsh";
 import { Button, Slider, Tooltip } from "nsh/base";
 import { alpha, tint } from "../../state/tint";
 import { imageFor } from "../../data/images";
 import { Icon, type IconColor, iconMotion, type IconName, SwapIcon } from "./icons";
 import { lazyMotion } from "./motion";
+import { regionItem } from "./regions";
 import { DISTANCE, DURATION, DURATION_CLASS, EASE_CLASS, SCALE, SMOOTH_OUT } from "./tokens";
 
 /** The app runs in a terminal: Cells and text, no images. */
@@ -18,6 +19,62 @@ export const terminal = platform.idiom === "terminal";
 
 /** The focus ring every control shares. */
 export const focusRing = "focus:outline focus:outline-2 focus:outline-ring";
+
+/** The keyboard's highlight on an item of a list that has the focus
+ * (`createListKeys`): the focus ring, drawn by the list's choice since its
+ * items are no stops of their own. */
+export const keyRing = platform.idiom === "terminal" ? "bg-muted" : "outline outline-2 outline-ring";
+
+/** What takes a press: a `Button` (a stop of Tab), or with
+ * `focusable={false}` a view that takes presses with a button's role and
+ * states, left to the pointer and to its list's arrow keys
+ * (`createListKeys`). `Button` has no `focusable` of its own. Read once. */
+export function Pressable(props: {
+  focusable?: boolean;
+  accessibilityLabel?: string;
+  selected?: boolean;
+  disabled?: boolean;
+  tooltip?: JSX.Element;
+  onPress: () => void;
+  class?: string;
+  classList?: Record<string, boolean>;
+  style?: ViewProps["style"];
+  children?: JSX.Element;
+}) {
+  if (untracked(() => props.focusable) === false) {
+    return (
+      <View
+        role="button"
+        focusable={false}
+        accessibilityLabel={props.accessibilityLabel}
+        accessibilityState={{ selected: props.selected ?? false, disabled: props.disabled ?? false }}
+        disabled={props.disabled ?? false}
+        tooltip={props.tooltip}
+        onPress={props.onPress}
+        class={props.class}
+        classList={props.classList}
+        style={props.style}
+      >
+        {props.children}
+      </View>
+    );
+  }
+  return (
+    <Button
+      ref={regionItem()}
+      accessibilityLabel={props.accessibilityLabel}
+      selected={props.selected ?? false}
+      disabled={props.disabled ?? false}
+      tooltip={props.tooltip}
+      onPress={props.onPress}
+      class={props.class}
+      classList={props.classList}
+      style={props.style}
+    >
+      {props.children}
+    </Button>
+  );
+}
 
 /** The popup surface every menu, popover and tooltip-like panel shares. */
 export const popupSurface = "rounded-(--radius-card) border border-border bg-popover p-1 shadow-lg";
@@ -86,9 +143,11 @@ export interface IconButtonProps {
 /** A borderless icon button: brighter on hover, primary while `pressed`. */
 export function IconButton(props: IconButtonProps) {
   const size = () => props.size ?? 18;
+  const item = regionItem();
   if (terminal) {
     return (
       <Button
+        ref={item}
         accessibilityLabel={props.label}
         disabled={props.disabled ?? false}
         selected={props.selected ?? false}
@@ -104,6 +163,7 @@ export function IconButton(props: IconButtonProps) {
   return (
     <View onMouseEnter={() => !props.disabled && hover.play(props.name)}>
     <Button
+      ref={item}
       accessibilityLabel={props.label}
       disabled={props.disabled ?? false}
       selected={props.selected ?? false}
@@ -137,7 +197,17 @@ export function IconButton(props: IconButtonProps) {
 /** The round play / pause button, `size` across. */
 /** `quiet`: no border or shadow, a faint disc (Now Playing, where the music
  * light leads). */
-export function PlayButton(props: { playing: boolean; size?: number; disabled?: boolean; tinted?: boolean; quiet?: boolean; onPress: () => void }) {
+export function PlayButton(props: {
+  playing: boolean;
+  size?: number;
+  disabled?: boolean;
+  tinted?: boolean;
+  quiet?: boolean;
+  /** `false`: no stop of Tab (a card's, in a list the arrow keys move
+   * through). */
+  focusable?: boolean;
+  onPress: () => void;
+}) {
   const size = () => props.size ?? 36;
   const label = () => (props.playing ? "Pause" : "Play");
   if (terminal) {
@@ -150,7 +220,8 @@ export function PlayButton(props: { playing: boolean; size?: number; disabled?: 
   const hover = iconMotion();
   return (
     <View onMouseEnter={() => !props.disabled && hover.play(props.playing ? "pause" : "play")}>
-    <Button
+    <Pressable
+      focusable={props.focusable}
       accessibilityLabel={label()}
       disabled={props.disabled ?? false}
       onPress={props.onPress}
@@ -164,7 +235,7 @@ export function PlayButton(props: { playing: boolean; size?: number; disabled?: 
           <SwapIcon name={props.playing ? "pause" : "play"} t={hover.t()} size={size() * 0.4} color="foreground" hex={props.tinted ? tint() : undefined} />
         </View>
       </View>
-    </Button>
+    </Pressable>
     </View>
   );
 }
@@ -178,9 +249,10 @@ export function ActionButton(props: {
   onPress: () => void;
 }) {
   const primary = () => props.variant === "primary";
+  const item = regionItem();
   if (terminal) {
     return (
-      <Button disabled={props.disabled ?? false} onPress={props.onPress} class="px-1 focus:bg-muted disabled:opacity-50">
+      <Button ref={item} disabled={props.disabled ?? false} onPress={props.onPress} class="px-1 focus:bg-muted disabled:opacity-50">
         <Text class={primary() ? "font-bold text-primary" : "text-foreground"}>[{props.label}]</Text>
       </Button>
     );
@@ -197,6 +269,7 @@ export function ActionButton(props: {
   });
   return (
     <Button
+      ref={item}
       disabled={props.disabled ?? false}
       onPress={props.onPress}
       class={`group h-9 items-center justify-center overflow-hidden rounded-full px-5 ${PRESS} ${PRESSED} disabled:opacity-40 ${focusRing} ${
