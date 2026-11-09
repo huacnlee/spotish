@@ -270,6 +270,23 @@ test("the lyrics follow the song, play from a line, and say when there are none"
   await app.waitFor("No lyrics for this song.");
 });
 
+test("narrow, a song with no lyrics keeps its cover in their place", async () => {
+  // Covers come with the rich demo; the plain one has none to show.
+  const app = await desktop({ premium: true, demo: "rich" });
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[Salt Lines, 2019 · Low Harbor]");
+  await app.waitFor("role:button[Breakwater, Low Harbor]");
+  await app.press("role:button[Breakwater, Low Harbor]");
+  await app.waitFor("id:player >> role:button[Pause]");
+  await app.press("id:player >> role:button[Lyrics]");
+  await app.waitFor("No lyrics for this song.");
+  // Wide, the cover is beside the lyrics already: not twice.
+  expect(app.shows("id:lyrics-cover")).toBe(false);
+  await app.setViewport(600, 900);
+  await app.waitFor("id:lyrics-cover");
+  expect(app.texts()).toContain("No lyrics for this song.");
+});
+
 test("? shows the keyboard shortcuts", async () => {
   const app = await desktop({ premium: true });
   await app.waitFor("Good evening, Ada");
