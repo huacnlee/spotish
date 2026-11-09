@@ -313,7 +313,7 @@ test("Ctrl and the arrows move between regions; the arrows and Return work insid
   await app.waitFor("id:player >> role:button[Pause]");
 });
 
-test("the music light switches to Current, and remembers it", async () => {
+test("the music light switches to Current, and Random picks another for each track", async () => {
   const app = await desktop({ premium: true });
   await app.waitFor("Good evening, Ada");
   await app.press("role:button[Paper Lanterns]");
@@ -326,4 +326,18 @@ test("the music light switches to Current, and remembers it", async () => {
   await app.press("role:menuitemradio[15 Current]");
   await app.waitFor("id:player >> role:button[Light: Current]");
   expect(app.storage()["visual:effect"]).toBe("current");
+
+  // Random picks another effect at once, and says which.
+  const shown = () => ["Spectrum", "Ribbons", "Bars", "Aurora", "Wave", "Halo", "Mountains", "Mesh", "Particles", "Strings", "Orb", "Dots", "Grid", "Rhythm", "Current"]
+    .find((name) => app.shows(`id:player >> role:button[Light: Random (${name})]`));
+  await app.press("id:player >> role:button[Light: Current]");
+  await app.press("role:menuitemradio[Random]");
+  await app.waitUntil(() => shown() !== undefined);
+  const first = shown();
+  expect(first).not.toBe("Current");
+  expect(app.storage()["visual:effect"]).toBe("random");
+
+  // The next track brings another.
+  await app.press("id:player >> role:button[Next]");
+  await app.waitUntil(() => shown() !== undefined && shown() !== first);
 });
