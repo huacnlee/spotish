@@ -18,9 +18,13 @@ export function TrackHeader(props: { showAlbum: boolean }) {
   return (
     <View class="mx-3 mb-1 h-8 flex-row items-center gap-3 border-b border-border/60 px-3">
       {/* The number column has no heading; "Title" starts where the covers
-          do, so the cover column and the title share one left edge. */}
+          do, so the cover column and the title share one left edge. It
+          spans the row's cover and its gap (48 pt) and the title's share,
+          so the shares match the row's and "Album" is over the albums. */}
       <View class="w-6" />
-      <Text class="flex-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Title</Text>
+      <Text class="flex-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground" style={{ flexBasis: 48 }}>
+        Title
+      </Text>
       <If when={props.showAlbum}>
         <Text class="flex-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Album</Text>
       </If>
