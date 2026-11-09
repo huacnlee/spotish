@@ -323,18 +323,18 @@ test("the music light switches to Current, and Random picks another for each tra
   // Current is last on the menu: scrolled to first.
   await app.press("id:player >> role:button[Light: Dots]");
   await app.scroll("role:menuitemradio[01 Dots]", 224);
-  await app.press("role:menuitemradio[15 Current]");
+  await app.press("role:menuitemradio[14 Current]");
   await app.waitFor("id:player >> role:button[Light: Current]");
   expect(app.storage()["visual:effect"]).toBe("current");
 
   // Opened again, the menu starts at the effect in use: Current is there
   // without a scroll.
   await app.press("id:player >> role:button[Light: Current]");
-  await app.press("role:menuitemradio[15 Current]");
+  await app.press("role:menuitemradio[14 Current]");
   await app.waitFor("id:player >> role:button[Light: Current]");
 
   // Random picks another effect at once, and says which.
-  const shown = () => ["Spectrum", "Ribbons", "Bars", "Aurora", "Wave", "Halo", "Mountains", "Mesh", "Particles", "Strings", "Orb", "Dots", "Grid", "Rhythm", "Current"]
+  const shown = () => ["Spectrum", "Ribbons", "Bars", "Aurora", "Wave", "Halo", "Mountains", "Mesh", "Particles", "Strings", "Orb", "Dots", "Grid", "Current"]
     .find((name) => app.shows(`id:player >> role:button[Light: Random (${name})]`));
   await app.press("id:player >> role:button[Light: Current]");
   await app.press("role:menuitemradio[Random]");

@@ -559,148 +559,6 @@ fn glow(p: vec2f, uv: vec2f) -> vec4f {
 }
 `;
 
-// A rhythm game's note highway as wide as the surface: lanes at about a
-// piano key's pitch, white notes (short, and some held long, each a stack
-// of short segments) falling to the bottom. The rhythm shoots them: on each
-// beat a handful of the loud lanes fire a short shot from the bottom at
-// the lane's lowest note, when it has come close. All the light stays down
-// there: a muzzle flash, a short bolt, a flash at the note's lower edge,
-// and sparks carried on the shot's way, up and out past the note's sides.
-// The note is knocked back up a little and settles, keeping its white but
-// brightening a little, segment by segment up from the hit. A different handful each beat, never all
-// of them; each shot plays out over about half a second.
-const RHYTHM = /* wgsl */ `
-const R_LAST = 0.55; // seconds a shot and its hit last
-const R_FIRE = 0.12; // share of that the shot flies; the hit follows
-
-// Whether lane l fires on this beat: a handful of lanes, chosen afresh for
-// each beat (its onset the seed, so the choice holds while it plays out),
-// the louder lanes likelier.
-fn r_on(l: f32, n: f32) -> f32 {
-  let v = spectrum((l + 0.5) / n);
-  let pick = hash(vec2f(l * 1.7 + 0.31, uniforms.onset * 3.7));
-  return step(pick, 0.08 + 0.4 * v) * step(uniforms.since, R_LAST);
-}
-
-fn glow(p: vec2f, uv: vec2f) -> vec4f {
-  let room = max(uniforms.reach, 12.0);
-  let n = max(floor(nsh.size.x / clamp(room * 0.16, 16.0, 40.0)), 6.0);
-  let lw = nsh.size.x / n;
-  let x = p.x / lw;
-  let lane = floor(x);
-  let fx = fract(x);
-  let up = nsh.size.y - p.y;
-  let top = room + 6.0;
-  let land = 3.0 + room * 0.04;
-  let fade = smoothstep(top, top * 0.5, up) * step(0.0, up);
-  let px = nsh.scale;
-  let gap = max(1.0, lw * 0.06);
-  let span = room * 0.3 + 8.0;
-  let flow = uniforms.clock * 1.4;
-  // Through the shot, 0..1; the hit's own time once the shot lands.
-  let t = clamp(uniforms.since / R_LAST, 0.0, 1.0);
-  let u = clamp((t - R_FIRE) / (1.0 - R_FIRE), 0.0, 1.0);
-  let landed = step(R_FIRE, t) * step(uniforms.since, R_LAST);
-
-  // The lane's lowest note: the first slot at or above the bottom with a
-  // note in it. Shot only when it has come down close.
-  var aim = vec2f(-1.0, -1.0);
-  for (var i = 0; i < 4; i = i + 1) {
-    let k = floor(flow) + f32(i);
-    let bottom = land + (k - flow) * span;
-    if (aim.x < 0.0 && bottom >= land && hash(vec2f(lane, k)) < 0.28) {
-      aim = vec2f(bottom, k);
-    }
-  }
-  let armed = r_on(lane, n) * step(0.0, aim.x) * step(aim.x, land + room * 0.3);
-  let hit = armed * landed;
-  // Knocked back: up a little at once, settling back as the beat goes.
-  let knock = hit * min(span * 0.22, 6.0) * smoothstep(0.0, 0.08, u) * (1.0 - u) * (1.0 - u);
-
-  // The notes; the struck one drawn where it is knocked to.
-  var s = (up - land) / span + flow;
-  let moved = (up - knock - land) / span + flow;
-  if (floor(moved) == aim.y && hit > 0.0) { s = moved; }
-  let slot = floor(s);
-  let is_hit = hit * step(aim.y, slot) * step(slot, aim.y);
-  let held = step(hash(vec2f(lane, slot)), 0.28);
-  let len = span * mix(0.18, 0.85, step(0.7, hash(vec2f(slot, lane + 7.0))) * hash(vec2f(lane + 3.0, slot)));
-  let cy = fract(s) * span - len * 0.5;
-  let half = vec2f(lw * 0.5 - gap * 1.5, len * 0.5);
-  let r = min(half.x, 3.0);
-  let q = abs(vec2f((fx - 0.5) * lw, cy)) - half + vec2f(r);
-  let d = length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
-  // Each note is a stack of short segments with a hairline between them.
-  let seg = clamp(span * 0.1, 4.0, 8.0);
-  let ly = cy + half.y;
-  let cut = clamp((seg - 1.2 - (ly - seg * floor(ly / seg))) * px + 0.5, 0.0, 1.0);
-  let block = clamp(0.5 - d * px, 0.0, 1.0) * cut * held * step(land, up);
-
-  // The shot, all of it low: a crisp bar at the muzzle, a short bolt up to
-  // the note, a flash along the note's lower edge where it hits.
-  let mid = abs(fx - 0.5) * lw;
-  let muzzle = armed * (1.0 - smoothstep(0.0, 0.1, t))
-    * clamp((lw * 0.3 - mid) * px, 0.0, 1.0) * clamp((1.2 - abs(up - land)) * px, 0.0, 1.0);
-  let head = land + (aim.x - land) * min(t / R_FIRE, 1.0);
-  let tail = max(head - 8.0, land);
-  let bolt = armed * (1.0 - step(R_FIRE, t)) * clamp((max(lw * 0.09, 1.0) - mid) * px + 0.5, 0.0, 1.0)
-    * step(tail, up) * step(up, head) * clamp((up - tail) / max(head - tail, 1.0), 0.3, 1.0);
-  let edge = aim.x + knock;
-  let flash = hit * (1.0 - smoothstep(0.0, 0.5, u))
-    * clamp((lw * 0.48 - mid) * px, 0.0, 1.0) * clamp((2.0 - abs(up - edge)) * px, 0.0, 1.0);
-
-  // Sparks from the hit, carried on the way the shot was going: up and out
-  // past the note's sides, slowing and fading. Drawn for this lane's hit
-  // and its neighbours' (they fly across the lane lines).
-  var sparks = 0.0;
-  var spark_rgb = vec3f(0.0);
-  for (var dl = -1; dl <= 1; dl = dl + 1) {
-    let l = lane + f32(dl);
-    if (l < 0.0 || l >= n) { continue; }
-    var a2 = -1.0;
-    for (var i = 0; i < 4; i = i + 1) {
-      let k = floor(flow) + f32(i);
-      let bottom = land + (k - flow) * span;
-      if (a2 < 0.0 && bottom >= land && hash(vec2f(l, k)) < 0.28) { a2 = bottom; }
-    }
-    let h2 = r_on(l, n) * step(0.0, a2) * step(a2, land + room * 0.3) * landed;
-    if (h2 <= 0.0) { continue; }
-    let c = vec2f((l + 0.5) * lw, a2);
-    let go = 1.0 - (1.0 - u) * (1.0 - u);
-    var sp = 0.0;
-    for (var j = 0; j < 8; j = j + 1) {
-      let h = hash(vec2f(l * 3.1 + f32(j), uniforms.onset * 1.3 + 9.0));
-      // Up and out to one side or the other, never back down.
-      let side = select(-1.0, 1.0, j % 2 == 0);
-      let ang = 1.5708 - side * (0.55 + 0.75 * h);
-      let dist = lw * (0.45 + 0.6 * hash(vec2f(f32(j), l + 5.0))) * go;
-      let at = c + vec2f(cos(ang) * dist, sin(ang) * dist);
-      // Bigger at first, shrinking as they fly.
-      let size = 1.0 + 1.2 * (1.0 - go);
-      sp = sp + clamp((size - length(vec2f(p.x, up) - at)) * px, 0.0, 1.0);
-    }
-    let b = h2 * min(sp, 1.0) * (1.0 - u);
-    sparks = sparks + b;
-    spark_rgb = spark_rgb + b * cycle((l + 0.5) / n * 0.75);
-  }
-
-  // The struck note keeps its white and only brightens a little, segment
-  // by segment up from where it was hit.
-  let colour = cycle((lane + 0.5) / n * 0.75);
-  let si = floor(ly / seg);
-  let front = u * (ceil(len / seg) + 1.0) * 1.4;
-  let hot = is_hit * clamp(front - si - 0.5, 0.0, 1.0);
-  let lead = is_hit * clamp(1.0 - abs(front - si - 0.5) * 2.0, 0.0, 1.0);
-  let wa = block * (0.6 + 0.25 * hot + 0.1 * lead);
-  // The light is the lane's colour (the shot, its flashes, the sparks); the
-  // notes stay white.
-  let ca = bolt * 0.85 + muzzle * 0.7 + flash * 0.9;
-  let a = wa + ca + sparks;
-  let rgb = (vec3f(1.0) * wa + colour * ca + spark_rgb) / max(a, 0.001);
-  return vec4f(rgb, a * fade * (0.6 + 0.4 * uniforms.level));
-}
-`;
-
 // Electric current: arcs between floating electrodes. The electrodes sit
 // along the strip the light owns, by turns high and low, drifting; arcs
 // burn between every other one (one to the one after next), so a high
@@ -869,14 +727,13 @@ const LIGHTS = {
   mesh: /* wgsl */ `${HEAD}${TERRAIN}${MESH}${LIGHT_TAIL}`,
   particles: /* wgsl */ `${HEAD}${TERRAIN}${PARTICLES}${LIGHT_TAIL}`,
   strings: /* wgsl */ `${HEAD}${STRINGS}${LIGHT_TAIL}`,
-  rhythm: /* wgsl */ `${HEAD}${RHYTHM}${WHITE_TAIL}`,
   current: /* wgsl */ `${HEAD}${CURRENT}${WHITE_TAIL}`,
 } as const;
 
 export type ToolbarEffect = keyof typeof LIGHTS;
 
 /** How many of the cover's colours each effect uses (up to four). */
-const COLORS: Record<ToolbarEffect, number> = { spectrum: 3, ribbons: 3, bars: 3, aurora: 3, wave: 3, halo: 3, mountains: 3, mesh: 3, particles: 3, strings: 3, orb: 3, dots: 3, grid: 3, rhythm: 3, current: 3 };
+const COLORS: Record<ToolbarEffect, number> = { spectrum: 3, ribbons: 3, bars: 3, aurora: 3, wave: 3, halo: 3, mountains: 3, mesh: 3, particles: 3, strings: 3, orb: 3, dots: 3, grid: 3, current: 3 };
 
 /** Each effect's name, for the switch. */
 export const EFFECT_NAMES: Record<ToolbarEffect, string> = {
@@ -893,7 +750,6 @@ export const EFFECT_NAMES: Record<ToolbarEffect, string> = {
   orb: "Orb",
   dots: "Dots",
   grid: "Grid",
-  rhythm: "Rhythm",
   current: "Current",
 };
 export const TOOLBAR_EFFECTS = Object.keys(LIGHTS) as ToolbarEffect[];
@@ -914,7 +770,6 @@ const REACH: Record<ToolbarEffect, number> = {
   particles: 0.9,
   strings: 0.5,
   orb: 1,
-  rhythm: 0.9,
   current: 0.7,
 };
 
