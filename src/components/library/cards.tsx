@@ -53,14 +53,16 @@ export function Card(props: {
   const play = () => (opens(props.item) ? toggleCollection(props.item.uri) : playItem(props.item));
   // Made once, here: inside the Button's style it would be made (and
   // played) again whenever the Button's props re-run. Its cover flips open
-  // just after the card starts to rise.
-  const { style: rise, cover: coverIn } = untracked(() =>
+  // (one of four ways) and its words rise, each a little after the card
+  // starts to rise, on timelines of their own.
+  const { style: rise, cover: coverIn, text: textIn } = untracked(() =>
     listItemEntrance({
       wave: props.wave,
       key: () => props.item?.uri ?? "",
       index: () => props.index ?? 0,
       axis: "translateY",
       turns: WAVE.cards,
+      coverTurn: "any",
     }),
   );
   return (
@@ -99,7 +101,7 @@ export function Card(props: {
           </View>
         </If>
       </View>
-      <View class={terminal ? "flex-row gap-1" : "gap-1"}>
+      <View class={terminal ? "flex-row gap-1" : "gap-1"} style={textIn}>
         <Text class="line-clamp-1 text-sm font-semibold text-foreground">{props.item.name}</Text>
         <Text class="line-clamp-2 text-xs text-muted-foreground">{props.item.subtitle}</Text>
       </View>

@@ -16,7 +16,7 @@ import {
   terminal,
 } from "../components/ui/controls";
 import { AFTER_REVEAL, createListWave, enter } from "../components/ui/motion";
-import { currentRoute } from "../nav";
+import { currentRoute, rootOpens } from "../nav";
 import {
   EmptyState,
   ErrorState,
@@ -119,6 +119,9 @@ function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
         const route = currentRoute();
         return route.name === "collection" && route.uri === props.uri;
       },
+      // Liked Songs is a root on the phone: its tab chosen again enters it
+      // anew.
+      reenter: rootOpens,
       afterReveal: !props.instant,
     }),
   );

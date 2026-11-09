@@ -11,7 +11,7 @@ import { TrackHeader, TrackRow } from "../components/library/tracks";
 import { SectionTitle, terminal } from "../components/ui/controls";
 import { EmptyState, ErrorState, Reveal, SearchSkeleton, Spinner } from "../components/ui/feedback";
 import { createListWave } from "../components/ui/motion";
-import { currentRoute } from "../nav";
+import { currentRoute, rootOpens } from "../nav";
 import { Icon } from "../components/ui/icons";
 import { backend } from "../state/engine";
 import { playTrack } from "../state/player";
@@ -89,7 +89,7 @@ export function SearchPage() {
               // Songs and cards wave in each time Search is entered, and each
               // new search's own results wave in as they take the old ones'
               // place; items scrolled to come in on their own.
-              const wave = createListWave({ isTop: () => currentRoute().name === "search", afterReveal: !instant });
+              const wave = createListWave({ isTop: () => currentRoute().name === "search", reenter: rootOpens, afterReveal: !instant });
               effect(() => {
                 found();
                 untracked(() => wave.restart());
