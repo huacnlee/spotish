@@ -7,7 +7,7 @@ import { CardRow } from "../components/library/cards";
 import { CardsSkeleton, ErrorState, Reveal } from "../components/ui/feedback";
 import { terminal } from "../components/ui/controls";
 import { createListWave, enter, waveDelay } from "../components/ui/motion";
-import { currentRoute } from "../nav";
+import { currentRoute, rootOpens } from "../nav";
 import { AppPage } from "../components/page";
 
 /** The greeting. It rises in only when made with `entrance` (the page
@@ -41,10 +41,11 @@ export function HomePage() {
         class="flex-1"
       >
         {(data, instant) => {
-          // When Home opens (not when it is gone back to), each section's
+          // When Home opens (not when it is gone back to; again when it is
+          // chosen again from the sidebar or its tab), each section's
           // cards come in as a wave, each section a little after the one above; cards scrolled
           // to come in on their own.
-          const wave = createListWave({ isTop: () => currentRoute().name === "home", afterReveal: !instant });
+          const wave = createListWave({ isTop: () => currentRoute().name === "home", reenter: rootOpens, afterReveal: !instant });
           return (
           <List
             each={data().sections}
