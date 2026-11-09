@@ -129,10 +129,10 @@ function NavItem(props: { icon: IconName; label: string; route: Route; compact: 
  * where it is used. */
 function LibraryRow(props: { item: Item | undefined; compact: boolean; index: number; wave?: ListWave }) {
   // The rows wave in when the library shows; a row scrolled to comes in on
-  // its own (its cover flipping open just after). Made once, here: the
+  // its own (its cover flipping open and its name sliding in just after). Made once, here: the
   // Button re-reads its style with its other props, and a motion made there
   // would play again.
-  const { style: entrance, cover: coverIn } = untracked(() =>
+  const { style: entrance, cover: coverIn, text: textIn } = untracked(() =>
     listItemEntrance({
       wave: props.wave,
       key: () => props.item?.uri ?? "",
@@ -175,9 +175,11 @@ function LibraryRow(props: { item: Item | undefined; compact: boolean; index: nu
         />
       </View>
       <If when={!props.compact || terminal}>
-        <Text class={`line-clamp-1 min-w-0 flex-1 text-sm font-medium ${current() ? "text-primary" : "text-foreground"}`}>
-          {props.item?.name ?? ""}
-        </Text>
+        <View class="min-w-0 flex-1" style={textIn}>
+          <Text class={`line-clamp-1 text-sm font-medium ${current() ? "text-primary" : "text-foreground"}`}>
+            {props.item?.name ?? ""}
+          </Text>
+        </View>
         <If when={current() && !terminal}>
           <PlayingBars playing={playingHere()} size={12} />
         </If>

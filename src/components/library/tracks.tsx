@@ -47,12 +47,13 @@ export function TrackRow(props: {
   wave?: ListWave;
   onPress: () => void;
 }) {
-  // The row slides in from the right and its cover flips open, once per
-  // track per entry. Made here, once, and bound as plain values: the Button
+  // The row slides in from the right, its cover flips open and its words
+  // slide in after it, each on a timeline of its own, once per track per
+  // entry. Made here, once, and bound as plain values: the Button
   // re-reads its style whenever any of its props changes (`selected` follows
   // every player update), and a motion made in that binding would play
   // again each time.
-  const { style: entrance, cover: coverIn } = untracked(() =>
+  const { style: entrance, cover: coverIn, text: textIn } = untracked(() =>
     listItemEntrance({
       wave: props.wave,
       key: () => (props.track ? props.track.uid + props.track.uri : ""),
@@ -100,7 +101,7 @@ export function TrackRow(props: {
       <View style={coverIn}>
         <Cover src={props.track?.image ?? ""} size={36} fallback="music" class="rounded-sm" />
       </View>
-      <View class={terminal ? "min-w-0 flex-1 flex-row gap-2" : "min-w-0 flex-1 gap-0.5"}>
+      <View class={terminal ? "min-w-0 flex-1 flex-row gap-2" : "min-w-0 flex-1 gap-0.5"} style={textIn}>
         <Text class={`line-clamp-1 text-sm text-foreground ${current() ? "font-semibold" : "font-medium"}`}>{props.track?.name ?? ""}</Text>
         <View class="flex-row items-center gap-1.5">
           <If when={!!props.track?.explicit && !terminal}>
