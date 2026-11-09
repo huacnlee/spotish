@@ -37,7 +37,7 @@
   "use strict";
 
   const PROTOCOL = 1;
-  const REVISION = 7;
+  const REVISION = 8;
   // Liked Songs' cover: the library reports it; the tracks query does not.
   const LIKED_IMAGE = "https://misc.scdn.co/liked-songs/liked-songs-640.png";
   let likedImage = "";
@@ -70,6 +70,8 @@
     upgrade: '[data-testid="upgrade-button"], a[href*="/premium"], button[aria-label*="Premium" i]',
     userWidget: '[data-testid="user-widget-link"], [data-testid="user-widget-name"]',
     actionPlay: '[data-testid="action-bar-row"] [data-testid="play-button"]',
+    // A podcast's page has no play button of its own: its newest episode's.
+    showPlay: '[data-testid="show-all-episode-list"] [data-testid="episode-0"] [data-testid="play-button"]',
     row: '[data-testid="tracklist-row"]',
     rowPlay: 'button[data-testid="play-button"], button[aria-label^="Play"], button[aria-label^="Pause"]',
     scroller: [
@@ -1081,10 +1083,12 @@
 
     // Opens `uri`'s page and waits for proof that it (not the previous page)
     // rendered: the page's own `data-test-uri`, or a new action bar.
+    // The play button of the page at `path`.
+    const pagePlay = (path) => q(path.startsWith("/show/") ? SEL.showPlay : SEL.actionPlay);
     const openPage = async (uri) => {
       const path = pathOf(uri);
       const loc = win.location;
-      const stale = loc.pathname === path ? null : q(SEL.actionPlay);
+      const stale = loc.pathname === path ? null : pagePlay(path);
       if (loc.pathname !== path) {
         win.history.pushState({}, "", path);
         win.dispatchEvent(new win.PopStateEvent("popstate", { state: {} }));
@@ -1093,7 +1097,7 @@
         if (win.location.pathname !== path) return false;
         if (/^[A-Za-z0-9:._-]+$/.test(uri) && q('[data-test-uri="' + uri + '"]')) return true;
         if (path === "/collection/tracks" && q('[data-test-uri$=":collection"], [data-test-uri="spotify:collection:tracks"]')) return true;
-        const button = q(SEL.actionPlay);
+        const button = pagePlay(path);
         return !!button && button !== stale && button.isConnected !== false;
       }, 15000);
       if (!proven) throw fail("E_TIMEOUT", "the page of " + uri + " did not render");
@@ -1208,10 +1212,10 @@
         refuseDuringAd("playContext");
         const path = await openPage(uri);
         if (!trackUri) {
-          const button = usable("play-button", await waitFor(() => q(SEL.actionPlay), 10000));
+          const button = usable("play-button", await waitFor(() => pagePlay(path), 10000));
           if (/pause/i.test(button.getAttribute("aria-label") || "")) return { confirmed: true }; // already playing it
           button.click();
-          const ok = await waitFor(() => /pause/i.test((q(SEL.actionPlay) && q(SEL.actionPlay).getAttribute("aria-label")) || "") || playerState().ad, 6000, 150);
+          const ok = await waitFor(() => /pause/i.test((pagePlay(path) && pagePlay(path).getAttribute("aria-label")) || "") || playerState().ad, 6000, 150);
           return { confirmed: !!ok };
         }
         const current = playerState();
