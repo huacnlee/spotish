@@ -312,3 +312,18 @@ test("Ctrl and the arrows move between regions; the arrows and Return work insid
   await app.keyboard.press("enter");
   await app.waitFor("id:player >> role:button[Pause]");
 });
+
+test("the music light switches to Current, and remembers it", async () => {
+  const app = await desktop({ premium: true });
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[Paper Lanterns]");
+  await app.press("role:button[Slow River, The Quiet Fields]");
+  await app.waitFor("id:player >> role:button[Pause]");
+
+  // Current is last on the menu: scrolled to first.
+  await app.press("id:player >> role:button[Light: Dots]");
+  await app.scroll("role:menuitemradio[01 Dots]", 224);
+  await app.press("role:menuitemradio[15 Current]");
+  await app.waitFor("id:player >> role:button[Light: Current]");
+  expect(app.storage()["visual:effect"]).toBe("current");
+});
