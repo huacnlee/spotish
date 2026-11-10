@@ -125,6 +125,15 @@ test("a free account hears that it shuffles, once a session", async () => {
   expect(app.texts()).not.toContain(notice);
 });
 
+test("the user menu links to the project and to sponsoring it", async () => {
+  const app = await desktop({ premium: true });
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[User menu: Ada]");
+  await app.press("role:menuitem[Sponsor]");
+  await app.waitUntil(() => app.openedUrls().length === 1);
+  expect(app.openedUrls()).toEqual(["https://github.com/sponsors/huacnlee"]);
+});
+
 test("signing out forgets the account's cache and goes back to Home", async () => {
   const app = await desktop({ premium: true });
   await app.waitFor("Good evening, Ada");
