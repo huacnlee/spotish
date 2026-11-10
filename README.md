@@ -103,7 +103,24 @@ on demand and has no ads.
 
 ## Benchmarks
 
-_TODO: measured footprint (native interface vs a full web player), startup and frame numbers._
+### Memory
+
+Measured on Linux (Chromium, x86_64) with music playing, summing the app's whole process tree. PSS splits pages shared
+between processes among them, so it is the real footprint; RSS counts every shared page once per process, which is
+why a system monitor that adds up RSS shows 600–800 MB.
+
+| Part | PSS | RSS |
+| --- | ---: | ---: |
+| Spotish itself (NSH, the Rust engine, the TSX interface) | 77 MB | 95 MB |
+| Spotify's web player page (Chromium renderer) | 219 MB | 294 MB |
+| Other Chromium renderers (service worker, frames) | 32 MB | 207 MB |
+| Chromium's browser, GPU, network, audio, storage and CDM processes | 52 MB | 210 MB |
+| **Total** | **381 MB** | **806 MB** |
+
+Most of the memory belongs to the headless browser that plays Spotify, mainly the web player's own JavaScript and
+page. The native interface stays under 100 MB.
+
+_TODO: startup and frame numbers._
 
 ## License
 
