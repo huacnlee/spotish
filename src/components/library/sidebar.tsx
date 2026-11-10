@@ -8,7 +8,7 @@ import { AlertDialog, Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import type { Item } from "../../backend/types";
 import { libraryQuery, meQuery } from "../../data/queries";
 import { currentRoute, type Route, switchTo } from "../../nav";
-import { NSH_URL, openExternal, openPremium, REPO_URL, SPOTIFY_URL } from "../../state/links";
+import { NSH_URL, openExternal, openPremium, REPO_URL, SPONSOR_URL, SPOTIFY_URL } from "../../state/links";
 import { setAboutOpen, setDrawerOpen } from "../../state/overlays";
 import { isCurrentContext, isPlayingContext, player } from "../../state/player";
 import { signedIn, signIn, signOut } from "../../state/session";
@@ -348,7 +348,8 @@ async function confirmSignOut(): Promise<void> {
 }
 
 /** The user menu: who is signed in and on which plan, then Premium, Spotish
- * and NSH, the FPS monitor, and Exit; Log out on the account's row. */
+ * (its source, and sponsoring it) and NSH, the FPS monitor, and Exit; Log
+ * out on the account's row. */
 function MenuEntries(props: { name: string; image: string }) {
   const premium = () => player().premium === true;
   return (
@@ -380,6 +381,7 @@ function MenuEntries(props: { name: string; image: string }) {
       <Separator />
       <Entry icon="info" label="About…" onSelect={() => setAboutOpen(true)} />
       <Entry icon="github" label="GitHub" external onSelect={() => openExternal(REPO_URL)} />
+      <Entry icon="heart" label="Sponsor" external onSelect={() => openExternal(SPONSOR_URL)} />
       <Entry icon="code" label="NSH" external onSelect={() => openExternal(NSH_URL)} />
       {/* NSH's performance monitor: frame rate, frame and commit costs. */}
       <Entry icon="activity" label="FPS" checked={fpsEnabled()} onSelect={() => setFpsEnabled(!fpsEnabled())} />
