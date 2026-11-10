@@ -31,7 +31,8 @@ use super::{
 pub const PROFILE_IN_USE_EXIT: i32 = 21;
 
 pub const PLAYER_URL: &str = "https://open.spotify.com/";
-pub const SIGN_IN_URL: &str = "https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F";
+pub const SIGN_IN_URL: &str =
+    "https://accounts.spotify.com/login?continue=https%3A%2F%2Fopen.spotify.com%2F";
 
 // --- Finding the browser -----------------------------------------------------
 
@@ -72,7 +73,12 @@ fn candidates() -> (Vec<&'static str>, Vec<PathBuf>) {
             "Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
         ];
         let mut locations = Vec::new();
-        for root in [Some(PathBuf::from("/Applications")), super::paths::in_home("Applications")].into_iter().flatten()
+        for root in [
+            Some(PathBuf::from("/Applications")),
+            super::paths::in_home("Applications"),
+        ]
+        .into_iter()
+        .flatten()
         {
             locations.extend(apps.iter().map(|app| root.join(app)));
         }
@@ -143,7 +149,9 @@ pub fn has_widevine(profile: &Path) -> bool {
 
 /// Whether `binary`'s installation ships its own Widevine (Chrome, Edge).
 pub fn bundles_widevine(binary: &Path) -> bool {
-    let Some(dir) = binary.parent() else { return false };
+    let Some(dir) = binary.parent() else {
+        return false;
+    };
     if dir.join("WidevineCdm").is_dir() {
         return true; // Linux Chrome and Edge
     }
@@ -159,13 +167,17 @@ pub fn bundles_widevine(binary: &Path) -> bool {
     // macOS: `….app/Contents/Frameworks/<framework>/Versions/<v>/Libraries/WidevineCdm`.
     let frameworks = dir.parent().map(|contents| contents.join("Frameworks"));
     frameworks.is_some_and(|frameworks| {
-        std::fs::read_dir(frameworks).into_iter().flatten().filter_map(|e| e.ok()).any(|framework| {
-            std::fs::read_dir(framework.path().join("Versions"))
-                .into_iter()
-                .flatten()
-                .filter_map(|e| e.ok())
-                .any(|v| v.path().join("Libraries/WidevineCdm").is_dir())
-        })
+        std::fs::read_dir(frameworks)
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .any(|framework| {
+                std::fs::read_dir(framework.path().join("Versions"))
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|e| e.ok())
+                    .any(|v| v.path().join("Libraries/WidevineCdm").is_dir())
+            })
     })
 }
 
@@ -194,7 +206,12 @@ fn widevine_sources() -> Vec<PathBuf> {
     let mut profiles = Vec::new();
     #[cfg(target_os = "macos")]
     if let Some(support) = dirs::data_dir() {
-        for p in ["Google/Chrome", "Chromium", "BraveSoftware/Brave-Browser", "Microsoft Edge"] {
+        for p in [
+            "Google/Chrome",
+            "Chromium",
+            "BraveSoftware/Brave-Browser",
+            "Microsoft Edge",
+        ] {
             profiles.push(support.join(p));
         }
     }
@@ -211,11 +228,19 @@ fn widevine_sources() -> Vec<PathBuf> {
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     if let Some(config) = dirs::config_dir() {
-        for p in ["chromium", "google-chrome", "BraveSoftware/Brave-Browser", "microsoft-edge"] {
+        for p in [
+            "chromium",
+            "google-chrome",
+            "BraveSoftware/Brave-Browser",
+            "microsoft-edge",
+        ] {
             profiles.push(config.join(p));
         }
     }
-    profiles.into_iter().map(|p| p.join("WidevineCdm")).collect()
+    profiles
+        .into_iter()
+        .map(|p| p.join("WidevineCdm"))
+        .collect()
 }
 
 /// Copies the newest Widevine version under `source` (a `WidevineCdm`
@@ -272,7 +297,10 @@ pub struct LockHolder {
 pub fn parse_singleton_lock(target: &str) -> Option<LockHolder> {
     let (host, pid) = target.rsplit_once('-')?;
     let pid = pid.parse::<u32>().ok().filter(|p| *p > 0)?;
-    Some(LockHolder { host: host.to_owned(), pid })
+    Some(LockHolder {
+        host: host.to_owned(),
+        pid,
+    })
 }
 
 /// The live process on this machine holding `profile`, if any. A stale lock
@@ -285,10 +313,14 @@ pub fn profile_holder(profile: &Path) -> Option<LockHolder> {
 
 /// The error for a profile another process holds.
 pub fn profile_in_use(pid: Option<u32>) -> EngineError {
-    let by = pid.map(|p| format!("process {p}")).unwrap_or_else(|| "another browser".into());
+    let by = pid
+        .map(|p| format!("process {p}"))
+        .unwrap_or_else(|| "another browser".into());
     EngineError::new(
         ErrorCode::ProfileInUse,
-        format!("Spotish's browser profile is in use by {by}. Quit it (or another Spotish) and Spotish starts again."),
+        format!(
+            "Spotish's browser profile is in use by {by}. Quit it (or another Spotish) and Spotish starts again."
+        ),
     )
 }
 
@@ -312,7 +344,9 @@ fn hostname() -> Option<String> {
 
 #[cfg(unix)]
 fn process_alive(pid: u32) -> bool {
-    let Ok(pid) = i32::try_from(pid) else { return false };
+    let Ok(pid) = i32::try_from(pid) else {
+        return false;
+    };
     // SAFETY: signal 0 only checks that the process exists.
     let rc = unsafe { libc::kill(pid, 0) };
     rc == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
@@ -336,7 +370,12 @@ pub struct RotatingLog {
 
 impl RotatingLog {
     pub fn open(path: PathBuf, limit: u64) -> RotatingLog {
-        let mut log = RotatingLog { path, limit, file: None, written: 0 };
+        let mut log = RotatingLog {
+            path,
+            limit,
+            file: None,
+            written: 0,
+        };
         log.reopen();
         log
     }
@@ -345,7 +384,11 @@ impl RotatingLog {
         if let Some(dir) = self.path.parent() {
             let _ = std::fs::create_dir_all(dir);
         }
-        self.file = std::fs::OpenOptions::new().create(true).append(true).open(&self.path).ok();
+        self.file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .ok();
         self.written = std::fs::metadata(&self.path).map(|m| m.len()).unwrap_or(0);
         if self.written >= self.limit / 2 {
             self.rotate();
@@ -357,7 +400,11 @@ impl RotatingLog {
         let mut old = self.path.as_os_str().to_owned();
         old.push(".1");
         let _ = std::fs::rename(&self.path, PathBuf::from(old));
-        self.file = std::fs::OpenOptions::new().create(true).append(true).open(&self.path).ok();
+        self.file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .ok();
         self.written = 0;
     }
 
@@ -375,16 +422,18 @@ impl RotatingLog {
 
 /// Copies a child's stderr into the rotating log, on a thread of its own.
 fn log_stderr(stderr: impl std::io::Read + Send + 'static, path: PathBuf, header: String) {
-    let _ = std::thread::Builder::new().name("spotish-browser-log".into()).spawn(move || {
-        let mut log = RotatingLog::open(path, 1 << 20);
-        log.line(&header);
-        for line in BufReader::new(stderr).lines() {
-            match line {
-                Ok(line) => log.line(&line),
-                Err(_) => break,
+    let _ = std::thread::Builder::new()
+        .name("spotish-browser-log".into())
+        .spawn(move || {
+            let mut log = RotatingLog::open(path, 1 << 20);
+            log.line(&header);
+            for line in BufReader::new(stderr).lines() {
+                match line {
+                    Ok(line) => log.line(&line),
+                    Err(_) => break,
+                }
             }
-        }
-    });
+        });
 }
 
 // --- Running it ----------------------------------------------------------------
@@ -400,10 +449,16 @@ pub struct StartError {
 
 impl StartError {
     pub fn transient(message: impl Into<String>) -> StartError {
-        StartError { error: EngineError::new(ErrorCode::Internal, message), permanent: false }
+        StartError {
+            error: EngineError::new(ErrorCode::Internal, message),
+            permanent: false,
+        }
     }
     pub fn permanent(error: EngineError) -> StartError {
-        StartError { error, permanent: true }
+        StartError {
+            error,
+            permanent: true,
+        }
     }
 }
 
@@ -412,7 +467,9 @@ pub fn classify_exit(status: ExitStatus) -> StartError {
     if status.code() == Some(PROFILE_IN_USE_EXIT) {
         return StartError::permanent(profile_in_use(None));
     }
-    StartError::transient(format!("the browser quit at start ({status}); see its log for why"))
+    StartError::transient(format!(
+        "the browser quit at start ({status}); see its log for why"
+    ))
 }
 
 /// A running browser; it is stopped when dropped.
@@ -421,10 +478,28 @@ pub struct Browser {
     started: Instant,
 }
 
+/// Features the headless player turns off on top of the ones every start does:
+/// site isolation, and the browser's own UI (the omnibox popup), which
+/// `--headless=new` still loads.
+const HEADLESS_DISABLED_FEATURES: &[&str] = &[
+    "IsolateOrigins",
+    "site-per-process",
+    "OptimizationHints",
+    "PreloadTopChromeWebUI",
+    "WebUIOmniboxPopup",
+    "WebUIOmniboxAimPopup",
+    "WebUIOmniboxFullPopup",
+];
+
 impl Browser {
-    fn command(binary: &Path, paths: &Paths) -> Result<Command, StartError> {
+    fn command(
+        binary: &Path,
+        paths: &Paths,
+        disabled_features: &[&str],
+    ) -> Result<Command, StartError> {
         let profile = paths.profile();
-        std::fs::create_dir_all(&profile).map_err(|e| StartError::transient(format!("{}: {e}", profile.display())))?;
+        std::fs::create_dir_all(&profile)
+            .map_err(|e| StartError::transient(format!("{}: {e}", profile.display())))?;
         if let Some(holder) = profile_holder(&profile) {
             return Err(StartError::permanent(profile_in_use(Some(holder.pid))));
         }
@@ -434,21 +509,46 @@ impl Browser {
             .arg("--no-first-run")
             .arg("--disable-extensions")
             .arg("--no-default-browser-check")
-            .arg("--disable-features=Translate,MediaRouter")
+            .arg(format!(
+                "--disable-features={}",
+                ["Translate", "MediaRouter"]
+                    .iter()
+                    .chain(disabled_features)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ))
             .arg("--autoplay-policy=no-user-gesture-required");
         // No --password-store override: use the system keyring, the same store
         // the user's own browser uses, so cookies persist across restarts and
         // an imported login decrypts.
-        command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
+        command
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped());
         Ok(command)
     }
 
-    fn spawn(mut command: Command, binary: &Path, paths: &Paths, what: &str) -> Result<Browser, StartError> {
-        let mut child = command.spawn().map_err(|e| StartError::transient(format!("{}: {e}", binary.display())))?;
+    fn spawn(
+        mut command: Command,
+        binary: &Path,
+        paths: &Paths,
+        what: &str,
+    ) -> Result<Browser, StartError> {
+        let mut child = command
+            .spawn()
+            .map_err(|e| StartError::transient(format!("{}: {e}", binary.display())))?;
         if let Some(stderr) = child.stderr.take() {
-            log_stderr(stderr, paths.browser_log(), format!("--- {what}: {} (pid {})", binary.display(), child.id()));
+            log_stderr(
+                stderr,
+                paths.browser_log(),
+                format!("--- {what}: {} (pid {})", binary.display(), child.id()),
+            );
         }
-        Ok(Browser { child, started: Instant::now() })
+        Ok(Browser {
+            child,
+            started: Instant::now(),
+        })
     }
 
     /// Starts `binary` headless on the profile, connected for automation.
@@ -457,14 +557,24 @@ impl Browser {
         paths: &Paths,
         events: mpsc::Sender<CdpEvent>,
     ) -> Result<(Browser, Arc<Cdp>), StartError> {
-        let mut command = Browser::command(binary, paths)?;
+        // Nobody sees this browser or its page: the app draws its own covers
+        // and controls. Turn off what only a visible browser needs, which
+        // takes the browser from about 650 MB to about 500 MB (PSS) on Linux.
+        let mut command = Browser::command(binary, paths, HEADLESS_DISABLED_FEATURES)?;
         command
             .arg("--headless=new")
             // The desktop layout, which has the player's whole bar.
-            .arg("--window-size=1280,900");
+            .arg("--window-size=1280,900")
+            // One renderer for the page and its frames, not one per site.
+            .arg("--disable-site-isolation-trials")
+            .arg("--renderer-process-limit=1")
+            // The page's images and animations are never shown.
+            .arg("--blink-settings=imagesEnabled=false")
+            .arg("--force-prefers-reduced-motion");
         #[cfg(unix)]
         {
-            let pipes = unix::Pipes::new().map_err(|e| StartError::transient(format!("debugging pipe: {e}")))?;
+            let pipes = unix::Pipes::new()
+                .map_err(|e| StartError::transient(format!("debugging pipe: {e}")))?;
             command.arg("--remote-debugging-pipe").arg("about:blank");
             pipes.hand_to(&mut command);
             unix::die_with_parent(&mut command);
@@ -494,7 +604,9 @@ impl Browser {
                     return Err(classify_exit(status));
                 }
                 if Instant::now() > deadline {
-                    return Err(StartError::transient("the browser did not open its DevTools port"));
+                    return Err(StartError::transient(
+                        "the browser did not open its DevTools port",
+                    ));
                 }
                 std::thread::sleep(Duration::from_millis(100));
             };
@@ -508,8 +620,10 @@ impl Browser {
     /// debugging port makes Google refuse the browser). Closing it is a
     /// clean quit, which flushes the new session's cookies to disk.
     pub fn start_sign_in(binary: &Path, paths: &Paths) -> Result<Browser, StartError> {
-        let mut command = Browser::command(binary, paths)?;
-        command.arg("--window-size=520,760").arg(format!("--app={SIGN_IN_URL}"));
+        let mut command = Browser::command(binary, paths, &[])?;
+        command
+            .arg("--window-size=520,760")
+            .arg(format!("--app={SIGN_IN_URL}"));
         #[cfg(unix)]
         unix::die_with_parent(&mut command);
         Browser::spawn(command, binary, paths, "sign-in")
@@ -644,7 +758,10 @@ mod unix {
             unsafe {
                 libc::close(self.commands.0);
                 libc::close(self.answers.1);
-                (File::from_raw_fd(self.answers.0), File::from_raw_fd(self.commands.1))
+                (
+                    File::from_raw_fd(self.answers.0),
+                    File::from_raw_fd(self.commands.1),
+                )
             }
         }
     }
@@ -679,7 +796,8 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("spotish-chrome-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("spotish-chrome-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -709,10 +827,19 @@ mod tests {
 
     #[test]
     fn reads_singleton_locks() {
-        assert_eq!(parse_singleton_lock("myhost-1234"), Some(LockHolder { host: "myhost".into(), pid: 1234 }));
+        assert_eq!(
+            parse_singleton_lock("myhost-1234"),
+            Some(LockHolder {
+                host: "myhost".into(),
+                pid: 1234
+            })
+        );
         assert_eq!(
             parse_singleton_lock("my-laptop.local-77"),
-            Some(LockHolder { host: "my-laptop.local".into(), pid: 77 })
+            Some(LockHolder {
+                host: "my-laptop.local".into(),
+                pid: 77
+            })
         );
         assert_eq!(parse_singleton_lock("nohyphen"), None);
         assert_eq!(parse_singleton_lock("host-abc"), None);
@@ -725,14 +852,25 @@ mod tests {
         let profile = scratch("lock");
         let host = hostname().unwrap();
         // This test's own process: alive, on this host.
-        std::os::unix::fs::symlink(format!("{host}-{}", std::process::id()), profile.join("SingletonLock")).unwrap();
-        assert_eq!(profile_holder(&profile).map(|h| h.pid), Some(std::process::id()));
+        std::os::unix::fs::symlink(
+            format!("{host}-{}", std::process::id()),
+            profile.join("SingletonLock"),
+        )
+        .unwrap();
+        assert_eq!(
+            profile_holder(&profile).map(|h| h.pid),
+            Some(std::process::id())
+        );
         std::fs::remove_file(profile.join("SingletonLock")).unwrap();
         // Another host's lock, and a dead pid: not held.
         std::os::unix::fs::symlink("elsewhere-1", profile.join("SingletonLock")).unwrap();
         assert_eq!(profile_holder(&profile), None);
         std::fs::remove_file(profile.join("SingletonLock")).unwrap();
-        std::os::unix::fs::symlink(format!("{host}-{}", i32::MAX - 7), profile.join("SingletonLock")).unwrap();
+        std::os::unix::fs::symlink(
+            format!("{host}-{}", i32::MAX - 7),
+            profile.join("SingletonLock"),
+        )
+        .unwrap();
         assert_eq!(profile_holder(&profile), None);
         let _ = std::fs::remove_dir_all(&profile);
         let e = profile_in_use(Some(42));
@@ -763,7 +901,11 @@ mod tests {
         let older = dir.join("chromium.log.1");
         assert!(size(&path) <= 600, "{}", size(&path));
         assert!(size(&older) <= 600);
-        assert!(std::fs::read_to_string(&path).unwrap().contains("line 0199"));
+        assert!(
+            std::fs::read_to_string(&path)
+                .unwrap()
+                .contains("line 0199")
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -776,9 +918,21 @@ mod tests {
         let paths = Paths::at(&dir);
         let (events, _heard) = mpsc::channel();
         let (mut browser, cdp) = Browser::start_headless(&binary, &paths, events).unwrap();
-        let version = cdp.call(None, "Browser.getVersion", serde_json::json!({}), Duration::from_secs(20)).unwrap();
+        let version = cdp
+            .call(
+                None,
+                "Browser.getVersion",
+                serde_json::json!({}),
+                Duration::from_secs(20),
+            )
+            .unwrap();
         assert!(version["product"].is_string());
-        let _ = cdp.call(None, "Browser.close", serde_json::json!({}), Duration::from_secs(5));
+        let _ = cdp.call(
+            None,
+            "Browser.close",
+            serde_json::json!({}),
+            Duration::from_secs(5),
+        );
         browser.wait_for_exit(Duration::from_secs(5));
         let _ = std::fs::remove_dir_all(&dir);
     }
