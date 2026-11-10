@@ -786,9 +786,6 @@ const ONSET = 22;
 const PHASE = 23;
 const CLOCK = 24;
 const SLOTS = 25;
-/** How often the light's time moves on: as often as the music's levels
- * come (src/platform/audio.ts), not with every frame of the display. */
-const STEPS_PER_SECOND = 60;
 /** Seconds the colours take to travel round, and the clock to wrap. */
 const PHASE_S = 24;
 const CLOCK_S = 600;
@@ -807,13 +804,16 @@ function lightUniforms(props: { effect: ToolbarEffect; colors: string[]; playing
   const live = liveValues(SLOTS);
   // Time moves the light while it plays, metered or not: the colours
   // travel round every 24 s; the clock wraps every ten minutes, where no
-  // effect shows it. It moves on about 60 times a second, as the music's
-  // levels do, never with every frame of the display: each step draws the
-  // light again, and on Linux each drawing is a copy of all its pixels
-  // through the CPU, which at 144 Hz across Now Playing cost about half a
-  // core. While the levels come, the clock steps with them (one drawing
-  // for both); while none come (nothing meters the music, as on macOS, or
-  // it is silent), two native loops step it, nothing from JS per frame.
+  // effect shows it. While the music's levels come (about 60 a second),
+  // the clock steps with them, so the light draws once for both and no
+  // more often than the music changes: following the display instead (144
+  // Hz and up) drew it again on every frame, and on Linux each drawing is
+  // a copy of all its pixels through the CPU, which across Now Playing
+  // cost about half a core. While none come (nothing meters the music, as
+  // on macOS, where the light draws straight to the screen, or it is
+  // silent), two native loops move it, nothing from JS per frame. (A
+  // stepped easing can't stand in for the levels' rate: NSH takes at most
+  // 10 000 steps, a step every 60 ms over the clock's ten minutes.)
   const phase = createAnimatedValue(0);
   const clock = createAnimatedValue(0);
   let started = 0;
@@ -826,8 +826,7 @@ function lightUniforms(props: { effect: ToolbarEffect; colors: string[]; playing
     }
     const loop = (value: AnimatedValue, toValue: number, seconds: number) => {
       value.set(0);
-      const easing = Easing.steps(Math.round(seconds * STEPS_PER_SECOND));
-      const run = Animated.loop(Animated.timing(value, { toValue, duration: seconds * 1000, easing }));
+      const run = Animated.loop(Animated.timing(value, { toValue, duration: seconds * 1000, easing: Easing.linear }));
       void run.start();
       return run;
     };
