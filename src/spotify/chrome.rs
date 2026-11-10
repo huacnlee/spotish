@@ -421,8 +421,21 @@ pub struct Browser {
     started: Instant,
 }
 
+/// Features the headless player turns off on top of the ones every start does:
+/// site isolation, and the browser's own UI (the omnibox popup), which
+/// `--headless=new` still loads.
+const HEADLESS_DISABLED_FEATURES: &[&str] = &[
+    "IsolateOrigins",
+    "site-per-process",
+    "OptimizationHints",
+    "PreloadTopChromeWebUI",
+    "WebUIOmniboxPopup",
+    "WebUIOmniboxAimPopup",
+    "WebUIOmniboxFullPopup",
+];
+
 impl Browser {
-    fn command(binary: &Path, paths: &Paths) -> Result<Command, StartError> {
+    fn command(binary: &Path, paths: &Paths, disabled_features: &[&str]) -> Result<Command, StartError> {
         let profile = paths.profile();
         std::fs::create_dir_all(&profile).map_err(|e| StartError::transient(format!("{}: {e}", profile.display())))?;
         if let Some(holder) = profile_holder(&profile) {
@@ -434,7 +447,7 @@ impl Browser {
             .arg("--no-first-run")
             .arg("--disable-extensions")
             .arg("--no-default-browser-check")
-            .arg("--disable-features=Translate,MediaRouter")
+            .arg(format!("--disable-features={}", [&["Translate", "MediaRouter"][..], disabled_features].concat().join(",")))
             .arg("--autoplay-policy=no-user-gesture-required");
         // No --password-store override: use the system keyring, the same store
         // the user's own browser uses, so cookies persist across restarts and
@@ -457,11 +470,20 @@ impl Browser {
         paths: &Paths,
         events: mpsc::Sender<CdpEvent>,
     ) -> Result<(Browser, Arc<Cdp>), StartError> {
-        let mut command = Browser::command(binary, paths)?;
+        // Nobody sees this browser or its page: the app draws its own covers
+        // and controls. Turn off what only a visible browser needs, which
+        // takes the browser from about 650 MB to about 500 MB (PSS) on Linux.
+        let mut command = Browser::command(binary, paths, HEADLESS_DISABLED_FEATURES)?;
         command
             .arg("--headless=new")
             // The desktop layout, which has the player's whole bar.
-            .arg("--window-size=1280,900");
+            .arg("--window-size=1280,900")
+            // One renderer for the page and its frames, not one per site.
+            .arg("--disable-site-isolation-trials")
+            .arg("--renderer-process-limit=1")
+            // The page's images and animations are never shown.
+            .arg("--blink-settings=imagesEnabled=false")
+            .arg("--force-prefers-reduced-motion");
         #[cfg(unix)]
         {
             let pipes = unix::Pipes::new().map_err(|e| StartError::transient(format!("debugging pipe: {e}")))?;
@@ -508,7 +530,7 @@ impl Browser {
     /// debugging port makes Google refuse the browser). Closing it is a
     /// clean quit, which flushes the new session's cookies to disk.
     pub fn start_sign_in(binary: &Path, paths: &Paths) -> Result<Browser, StartError> {
-        let mut command = Browser::command(binary, paths)?;
+        let mut command = Browser::command(binary, paths, &[])?;
         command.arg("--window-size=520,760").arg(format!("--app={SIGN_IN_URL}"));
         #[cfg(unix)]
         unix::die_with_parent(&mut command);
