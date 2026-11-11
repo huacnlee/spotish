@@ -599,3 +599,50 @@ test("lyricsOf reads timed and plain lines, and none", () => {
   assert.deepEqual(plain, { synced: false, provider: "lyricfind", lines: [{ startMs: 0, words: "Only words" }] });
   assert.deepEqual(B.lyricsOf(null), { synced: false, lines: [], provider: "" });
 });
+
+test("morePages reads every page after the first, in order, a few at a time", async () => {
+  const all = Array.from({ length: 1234 }, (_, i) => i);
+  const asked = [];
+  let running = 0;
+  let peak = 0;
+  const load = async (offset) => {
+    asked.push(offset);
+    running++;
+    peak = Math.max(peak, running);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    running--;
+    return all.slice(offset, offset + 100);
+  };
+  const rest = await B.morePages(100, all.length, load);
+  assert.deepEqual([...all.slice(0, 100), ...rest], all);
+  assert.deepEqual(asked, [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200]);
+  assert.equal(peak, 4);
+  // Nothing more to read.
+  assert.deepEqual(await B.morePages(5, 5, load), []);
+  assert.deepEqual(await B.morePages(0, 10, load), []);
+});
+
+test("morePages keeps a whole prefix when a page fails or is empty, and warns", async () => {
+  const warnings = [];
+  const warn = (message) => warnings.push(message);
+  const items = (offset) => Array.from({ length: 100 }, (_, i) => offset + i);
+  const failing = await B.morePages(100, 1000, async (offset) => {
+    if (offset === 300) throw new Error("HTTP 429");
+    return items(offset);
+  }, { warn });
+  // Pages 100 and 200 came before the failure; 400 came after it and is dropped, so there is no gap.
+  assert.equal(failing.length, 200);
+  assert.equal(failing[199], 299);
+  assert.ok(/stopped at 300 of 1000.*HTTP 429/.test(warnings[0]), warnings[0]);
+
+  const empty = await B.morePages(100, 1000, async (offset) => (offset === 200 ? [] : items(offset)), { warn });
+  assert.equal(empty.length, 100);
+  assert.ok(/empty page/.test(warnings[1]), warnings[1]);
+});
+
+test("morePages stops at the cap and says so", async () => {
+  const warnings = [];
+  const rest = await B.morePages(100, 5000, async (offset) => Array.from({ length: 100 }, (_, i) => offset + i), { max: 450, warn: (m) => warnings.push(m) });
+  assert.equal(rest.length, 400);
+  assert.ok(/cut at 450 of 5000/.test(warnings[0]), warnings[0]);
+});

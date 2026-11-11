@@ -199,6 +199,34 @@
       .filter((line, i, all) => !(line.words === "♪" && i === all.length - 1));
     return { synced, lines, provider: l.providerDisplayName || l.provider || "" };
   };
+  // The rest of a long list: the entries after the `loaded` ones of its first
+  // page, up to `total`, read in pages of that same size, a few at a time and
+  // in order. `load(offset)` resolves to one page's entries. A page that fails
+  // or comes back empty ends the list there (and is warned of), so what is
+  // returned is always a whole prefix, never one with a gap. At most `max`
+  // entries are read in all.
+  const morePages = async (loaded, total, load, options) => {
+    const o = options || {};
+    const size = o.size || loaded;
+    const batch = o.batch || 4;
+    const end = Math.min(total, o.max || 20000);
+    const out = [];
+    if (!(size > 0)) return out;
+    for (let start = loaded; start < end; start += size * batch) {
+      const offsets = [];
+      for (let k = 0; k < batch && start + k * size < end; k++) offsets.push(start + k * size);
+      const pages = await Promise.all(offsets.map((offset) => load(offset).then((items) => ({ items }), (error) => ({ error }))));
+      for (const page of pages) {
+        if (page.error || !page.items.length) {
+          if (o.warn) o.warn("[spotish] list stopped at " + (loaded + out.length) + " of " + total + ": " + (page.error ? (page.error && page.error.message) || page.error : "an empty page"));
+          return out;
+        }
+        out.push(...page.items);
+      }
+    }
+    if (o.warn && total > end) o.warn("[spotish] list cut at " + end + " of " + total);
+    return out;
+  };
   const trackIdFromHref = (href) => {
     const text = String(href || "");
     const m = /\/track\/([A-Za-z0-9]+)/.exec(text) || /spotify(?::|%3A)track(?::|%3A)([A-Za-z0-9]+)/i.exec(text);
@@ -767,7 +795,15 @@
         const data = await gql(op, { uri, offset, limit: 100, enableWatchFeedEntrypoint: false });
         missingEntity(op, data.playlistV2, uri);
         const p = need(op, data, "playlistV2", warn);
-        const entries = need(op, data, "playlistV2.content.items", warn);
+        const firstEntries = need(op, data, "playlistV2.content.items", warn);
+        const entries = firstEntries.concat(
+          await morePages(
+            offset + firstEntries.length,
+            p.content.totalCount || 0,
+            async (more) => need(op, await gql(op, { uri, offset: more, limit: 100, enableWatchFeedEntrypoint: false }), "playlistV2.content.items", warn),
+            { warn, size: firstEntries.length },
+          ),
+        );
         const tracks = entries.map((i) => track(unwrap(i.itemV2), i.uid)).filter(Boolean);
         const owner = (p.ownerV2 && p.ownerV2.data && p.ownerV2.data.name) || "";
         return {
@@ -833,7 +869,16 @@
         const op = "fetchLibraryTracks";
         const data = await gql(op, { offset, limit: 100 });
         const t = need(op, data, "me.library.tracks", warn);
-        const tracks = likedTracks(need(op, data, "me.library.tracks.items", warn));
+        const firstItems = need(op, data, "me.library.tracks.items", warn);
+        const items = firstItems.concat(
+          await morePages(
+            offset + firstItems.length,
+            t.totalCount || 0,
+            async (more) => need(op, await gql(op, { offset: more, limit: 100 }), "me.library.tracks.items", warn),
+            { warn, size: firstItems.length },
+          ),
+        );
+        const tracks = likedTracks(items);
         return {
           header: { uri: "spotify:collection:tracks", kind: "collection", name: "Liked Songs", subtitle: (t.totalCount || tracks.length) + " songs", image: likedImage || LIKED_IMAGE, description: "" },
           tracks,
@@ -1349,6 +1394,7 @@
     createHashCache,
     paletteOf,
     lyricsOf,
+    morePages,
     item,
     track,
     likedTrack,
