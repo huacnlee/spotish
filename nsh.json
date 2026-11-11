@@ -1,7 +1,7 @@
 {
   "name": "Spotish",
   "id": "dev.huacnlee.spotish",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "build": 1,
   "icon": "icon.png",
   "appearance": "system",
@@ -13,7 +13,7 @@
     }
   },
   "rust": ".",
-  "minRuntime": "0.4.0",
+  "minRuntime": "0.5.0",
   "updater": {
     "github": "huacnlee/spotish"
   },

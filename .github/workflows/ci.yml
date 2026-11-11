@@ -37,22 +37,22 @@ jobs:
         with:
           node-version: 22
 
-      # Spotish follows NSH's main: the nightly CLI (https://nsh.dev/docs/installation).
-      - name: Install the NSH CLI (nightly)
+      # Use the same stable NSH release as Cargo.toml.
+      - name: Install the NSH CLI (0.5.0)
         run: |
-          curl -fsSL https://nsh.dev/install.sh | sh -s -- --nightly
+          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
-      # Cargo.lock holds NSH's main at the commit the CLI was built from.
-      # The nightly tag moves; say so when they part (see CONTRIBUTING.md).
+      # Reject a CLI that differs from the locked runtime.
       - name: Compare the CLI with the locked NSH
         run: |
           cli="$(nsh --version | sed -n 's/.*(\([0-9a-f]\{7,\}\)[ )].*/\1/p')"
           locked="$(grep -A2 '^name = "nsh-core"$' Cargo.lock | sed -n 's/^source = ".*#\([0-9a-f]*\)"$/\1/p')"
           echo "nsh CLI: $cli, Cargo.lock: $locked"
+          [ -n "$cli" ] && [ -n "$locked" ] || exit 1
           case "$locked" in
             "$cli"*) ;;
-            *) echo "::warning::The nightly nsh CLI ($cli) is not the NSH commit Cargo.lock holds ($locked); run cargo update -p nsh-core." ;;
+            *) echo "::error::NSH CLI ($cli) differs from Cargo.lock ($locked)."; exit 1 ;;
           esac
 
       - name: nsh check
