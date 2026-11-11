@@ -419,6 +419,13 @@
     return { uri: data.uri, kind, name: data.name || (data.profile && data.profile.name) || "", subtitle, image: imageOf(data) };
   };
 
+  // When an album came out: an ISO 8601 time, or its year, or "" when
+  // Spotify gives neither.
+  const releaseDateOf = (album) => {
+    const d = album && album.date;
+    return (d && (d.isoString || (d.year ? String(d.year) : ""))) || "";
+  };
+
   const track = (data, uid) => {
     if (!data || !data.uri || kindOf(data.uri) !== "track") return null;
     const album = data.albumOfTrack || {};
@@ -433,8 +440,12 @@
       durationMs: (data.duration && data.duration.totalMilliseconds) || (data.trackDuration && data.trackDuration.totalMilliseconds) || 0,
       explicit: !!data.contentRating && data.contentRating.label === "EXPLICIT",
       playable: data.playability ? data.playability.playable !== false : true,
+      releaseDate: releaseDateOf(album),
     };
   };
+  // When a playlist or Liked Songs entry was added: an ISO 8601 time, or
+  // "" when Spotify gives none.
+  const addedAtOf = (entry) => (entry && entry.addedAt && entry.addedAt.isoString) || "";
   const unwrap = (w) => (w && (w.data || (w.item && w.item.data) || (w.itemV2 && w.itemV2.data))) || w;
 
   // A Liked Songs entry: its URI is on the wrapper (`_uri`), or in its data.
@@ -444,7 +455,9 @@
     const uidUri = entry && typeof entry.uid === "string" && entry.uid.startsWith("spotify:track:") ? entry.uid : "";
     const uri = data.uri || (wrapper && wrapper._uri) || (wrapper && wrapper.data && wrapper.data.uri) || uidUri;
     if (!uri) return null;
-    return track(Object.assign({}, data, { uri }), (wrapper && wrapper._uri) || (entry && entry.uid) || uri);
+    const t = track(Object.assign({}, data, { uri }), (wrapper && wrapper._uri) || (entry && entry.uid) || uri);
+    if (t) t.addedAt = addedAtOf(entry);
+    return t;
   };
   const likedTracks = (items) => {
     const tracks = (items || []).map(likedTrack).filter(Boolean);
@@ -768,7 +781,13 @@
         missingEntity(op, data.playlistV2, uri);
         const p = need(op, data, "playlistV2", warn);
         const entries = need(op, data, "playlistV2.content.items", warn);
-        const tracks = entries.map((i) => track(unwrap(i.itemV2), i.uid)).filter(Boolean);
+        const tracks = entries
+          .map((i) => {
+            const t = track(unwrap(i.itemV2), i.uid);
+            if (t) t.addedAt = addedAtOf(i);
+            return t;
+          })
+          .filter(Boolean);
         const owner = (p.ownerV2 && p.ownerV2.data && p.ownerV2.data.name) || "";
         return {
           header: { uri, kind: "playlist", name: p.name || "", subtitle: owner + (p.content.totalCount ? " · " + p.content.totalCount + " songs" : ""), image: imageOf(p), description: (p.description || "").replace(/<[^>]+>/g, "") },
@@ -1352,6 +1371,7 @@
     item,
     track,
     likedTrack,
+    addedAtOf,
     likedTracks,
     createBridge,
     install,

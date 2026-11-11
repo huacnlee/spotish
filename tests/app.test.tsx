@@ -2,6 +2,8 @@
 // the steps a user takes: navigation, playback, the free tier, signing out,
 // the phone's drawer and the keyboard.
 import { expect, open, test } from "nsh/test";
+import { collection } from "../src/backend/fixtures";
+import { sortTracks } from "../src/components/library/track-sort";
 
 /** What a launch after the first one has in its storage. */
 const LAUNCHED = { "firstRun:done": "1" };
@@ -355,4 +357,76 @@ test("the music light switches to Current, and Random picks another for each tra
   // The next track brings another.
   await app.press("id:player >> role:button[Next]");
   await app.waitUntil(() => shown() !== undefined && shown() !== first);
+});
+
+test("a playlist's tracks can be sorted by date added, newest first", async () => {
+  const uri = "spotify:playlist:morningstatic";
+  const tracks = collection(uri)?.tracks ?? [];
+  expect(tracks.length).toBeGreaterThan(2);
+  const first = tracks[0];
+  const newest = sortTracks(tracks, "added")[0];
+  // The demo's dates are shuffled against the playlist's order.
+  expect(newest.uri).not.toBe(first.uri);
+
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[Morning Static]");
+  await app.waitFor(`role:button[${first.name}, ${first.artists}]`);
+  const before = app.texts();
+  expect(before.indexOf(first.name)).toBeLessThan(before.indexOf(newest.name));
+
+  await app.press("role:button[Sort tracks: Custom order]");
+  await app.waitFor("role:menuitemcheckbox[Recently added]");
+  await app.press("role:menuitemcheckbox[Recently added]");
+  await app.waitFor("role:button[Sort tracks: Recently added ↓]");
+  const after = app.texts();
+  expect(after.indexOf(newest.name)).toBeLessThan(after.indexOf(first.name));
+});
+
+test("a playlist can be sorted by title and shown compact", async () => {
+  const tracks = collection("spotify:playlist:morningstatic")?.tracks ?? [];
+  const alphabetical = sortTracks(tracks, "title");
+  expect(alphabetical[0].uri).not.toBe(tracks[0].uri);
+
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[Morning Static]");
+  await app.waitFor(`role:button[${tracks[0].name}, ${tracks[0].artists}]`);
+
+  await app.press("role:button[Sort tracks: Custom order]");
+  await app.press("role:menuitemcheckbox[Title]");
+  await app.waitFor("role:button[Sort tracks: Title ↑]");
+  const texts = app.texts();
+  expect(texts.indexOf(alphabetical[0].name)).toBeLessThan(texts.indexOf(tracks[0].name));
+
+  // Compact keeps every row, with the sort kept.
+  await app.press("role:button[Sort tracks: Title ↑]");
+  await app.press("role:menuitemcheckbox[Compact]");
+  await app.waitFor(`role:button[${alphabetical[0].name}, ${alphabetical[0].artists}]`);
+  expect(app.shows("role:button[Sort tracks: Title ↑]")).toBe(true);
+});
+
+test("choosing the sort in use again runs it the other way", async () => {
+  const tracks = collection("spotify:playlist:morningstatic")?.tracks ?? [];
+  const up = sortTracks(tracks, "title");
+  const down = sortTracks(tracks, "title", true);
+  expect(down[0].uri).not.toBe(up[0].uri);
+
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  await app.press("role:button[Morning Static]");
+  await app.waitFor(`role:button[${tracks[0].name}, ${tracks[0].artists}]`);
+
+  await app.press("role:button[Sort tracks: Custom order]");
+  await app.press("role:menuitemcheckbox[Title]");
+  await app.waitFor("role:button[Sort tracks: Title ↑]");
+  const first = app.texts();
+  expect(first.indexOf(up[0].name)).toBeLessThan(first.indexOf(down[0].name));
+
+  await app.press("role:button[Sort tracks: Title ↑]");
+  // The entry in use carries its direction.
+  await app.press("role:menuitemcheckbox[Title ↑]");
+  await app.waitFor("role:button[Sort tracks: Title ↓]");
+  const second = app.texts();
+  expect(second.indexOf(down[0].name)).toBeLessThan(second.indexOf(up[0].name));
 });
