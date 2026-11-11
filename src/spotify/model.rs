@@ -187,6 +187,40 @@ pub struct LyricLine {
     pub words: String,
 }
 
+/// What the signed-in user's friends last listened to.
+#[derive(Debug, Clone, PartialEq, Default, Deserialize, JsObject)]
+#[serde(default)]
+pub struct Friends {
+    /// One entry per friend, newest first.
+    pub friends: Vec<Friend>,
+}
+
+/// One friend and what they last listened to.
+#[derive(Debug, Clone, PartialEq, Default, Deserialize, JsObject)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Friend {
+    /// The friend's user id.
+    pub user_id: String,
+    /// Their display name.
+    pub name: String,
+    /// Their avatar URL, empty when there is none.
+    pub user_image: String,
+    /// `track`, `episode` or `context` (a playlist, album or artist).
+    pub kind: String,
+    /// The Spotify URI of what they listened to.
+    pub uri: String,
+    /// Its name.
+    pub title: String,
+    /// The line under it (artist and album, show, or owner).
+    pub subtitle: String,
+    /// Its cover URL, empty when it has none.
+    pub image: String,
+    /// When they listened, in ms since the epoch.
+    pub timestamp: f64,
+    /// Whether that was within the last five minutes.
+    pub playing: bool,
+}
+
 /// How the player repeats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, PropEnum)]
 #[serde(rename_all = "camelCase")]

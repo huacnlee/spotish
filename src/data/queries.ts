@@ -2,8 +2,9 @@
 // again with each new epoch (ready, signed in or out, a new token).
 
 import { type Accessor, resource, type Resource } from "nsh";
-import { type CachedQuery, cachedQuery } from "./cache";
-import { type Collection, type Home, kindOf, type Library, type Lyrics, type Me } from "../backend/types";
+import { type CachedQuery, cachedQuery, readCache } from "./cache";
+import { mergeFriends } from "./friends";
+import { type Collection, type Friend, type Home, kindOf, type Library, type Lyrics, type Me } from "../backend/types";
 import { backend } from "../state/engine";
 import { cacheAccount, dataEpoch } from "../state/session";
 
@@ -42,6 +43,20 @@ export function libraryQuery(): CachedQuery<Library> {
   return cachedQuery(
     scoped(() => (backend.signedIn() === true ? "library" : null)),
     () => backend.library(),
+  );
+}
+
+/** What the signed-in user's friends last listened to (nothing while signed
+ * out). Each load is merged into the list kept from the ones before, as the
+ * feed itself holds only a few of the latest. */
+export function friendsQuery(): CachedQuery<Friend[]> {
+  return cachedQuery(
+    scoped(() => (backend.signedIn() === true ? "friends" : null)),
+    async () => {
+      const account = cacheAccount();
+      const before = (account === null ? undefined : readCache<Friend[]>(account, "friends")) ?? [];
+      return mergeFriends(before, await backend.friends(), Date.now());
+    },
   );
 }
 

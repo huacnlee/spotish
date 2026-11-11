@@ -10,6 +10,7 @@ import {
   backendError,
   type Collection,
   EMPTY_PLAYER,
+  type Friend,
   type Health,
   type Home,
   type Library,
@@ -121,6 +122,10 @@ export class DemoBackend implements Backend {
 
   lyrics(trackUri: string): Promise<Lyrics> {
     return this.#data(() => fixtures.lyrics(trackUri), false);
+  }
+
+  friends(): Promise<Friend[]> {
+    return this.#data(() => fixtures.friends(), true);
   }
 
   me(): Promise<Me> {

@@ -199,6 +199,43 @@
       .filter((line, i, all) => !(line.words === "♪" && i === all.length - 1));
     return { synced, lines, provider: l.providerDisplayName || l.provider || "" };
   };
+  // What Spotify's friend feed (`presence-view/v1/buddylist`) says each
+  // friend listened to last: the friend, what it was (a track, an episode, or
+  // a playlist or other context), when (ms since the epoch), and whether
+  // that was within the last five minutes, i.e. still playing. Newest first;
+  // entries with no user are dropped.
+  const FRIEND_LIVE_MS = 5 * 60 * 1000;
+  const friendsOf = (json, nowMs) => {
+    const list = json && Array.isArray(json.friends) ? json.friends : [];
+    return list
+      .map((entry) => {
+        const f = entry && entry.friend && entry.friend.user ? entry.friend : entry;
+        const user = f && f.user;
+        if (!user || !user.uri) return null;
+        const timestamp = Number.isFinite(f.timestamp) ? f.timestamp : nowMs;
+        const base = {
+          userId: String(user.uri).replace(/^spotify:user:/, ""),
+          name: user.name || user.uri,
+          userImage: user.imageUrl || "",
+          timestamp,
+          playing: false,
+        };
+        const live = nowMs - timestamp >= 0 && nowMs - timestamp < FRIEND_LIVE_MS;
+        const t = f.track;
+        const e = f.episode;
+        const p = f.playlist || (f.context && f.context.uri ? f.context : null);
+        if (t) {
+          return { ...base, kind: "track", uri: t.uri || "", title: t.name || "", subtitle: [t.artist && t.artist.name, t.album && t.album.name].filter(Boolean).join(" · "), image: t.imageUrl || (t.album && t.album.imageUrl) || "", playing: live };
+        }
+        if (e) {
+          return { ...base, kind: "episode", uri: e.uri || "", title: e.name || "", subtitle: (e.show && e.show.name) || "", image: e.imageUrl || (e.show && e.show.imageUrl) || "", playing: live };
+        }
+        if (p) return { ...base, kind: "context", uri: p.uri || "", title: p.name || "", subtitle: (p.owner && p.owner.name) || "", image: p.imageUrl || "" };
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  };
   const trackIdFromHref = (href) => {
     const text = String(href || "");
     const m = /\/track\/([A-Za-z0-9]+)/.exec(text) || /spotify(?::|%3A)track(?::|%3A)([A-Za-z0-9]+)/i.exec(text);
@@ -866,6 +903,29 @@
         return { hex, palette: palette.length ? palette : hex ? [hex] : [] };
       },
 
+      // What the signed-in user's friends last listened to (see `friendsOf`),
+      // from the same friend feed the web player's activity panel reads;
+      // none when the account follows nobody. Spotify exposes only the five
+      // friends who listened most recently at a time, however many the
+      // account follows: tried against a real account, the feed returned five
+      // entries, and the `limit`, `count` and `max` query parameters changed
+      // nothing. The app keeps the friends of earlier loads (`mergeFriends`).
+      async friends() {
+        if (!shared.headers) await waitFor(() => shared.headers, 20000);
+        if (!shared.headers) throw fail("E_NO_AUTH", "the web player has not signed its requests yet");
+        let response;
+        try {
+          response = await pageFetch.call(win, "https://spclient.wg.spotify.com/presence-view/v1/buddylist", {
+            headers: Object.assign({ accept: "application/json" }, shared.headers, { "app-platform": shared.headers["app-platform"] || "WebPlayer" }),
+          });
+        } catch (error) {
+          throw fail("E_NETWORK", "friends: " + ((error && error.message) || error));
+        }
+        if (response.status === 401) throw fail("E_NO_AUTH", "friends: HTTP 401");
+        if (!response.ok) throw fail("E_HTTP", "friends: HTTP " + response.status);
+        return { friends: friendsOf(await response.json(), now()) };
+      },
+
       // A track's lyrics (see `lyricsOf`), as the web player's lyrics view
       // loads them; none (no lines) when Spotify has none for it.
       async lyrics(trackUri) {
@@ -1349,6 +1409,7 @@
     createHashCache,
     paletteOf,
     lyricsOf,
+    friendsOf,
     item,
     track,
     likedTrack,

@@ -15,6 +15,7 @@ import {
   type Collection,
   EMPTY_PLAYER,
   errorOf,
+  type Friend,
   type Health,
   type Home,
   type Library,
@@ -166,6 +167,11 @@ export class EngineBackend implements Backend {
   async lyrics(trackUri: string): Promise<Lyrics> {
     const l = await call(() => this.#spotify.lyrics(trackUri));
     return { synced: l.synced, provider: l.provider, lines: l.lines.map((line) => ({ startMs: line.startMs, words: line.words })) };
+  }
+
+  async friends(): Promise<Friend[]> {
+    const { friends } = await call(() => this.#spotify.friends());
+    return friends.map((f) => ({ ...f }));
   }
 
   async me(): Promise<Me> {

@@ -12,9 +12,10 @@ import { Icon } from "./ui/icons";
 import { openPremium } from "../state/links";
 import { player } from "../state/player";
 import { signedIn, signIn } from "../state/session";
-import { layout, sidebarShown } from "./layout";
+import { friendsAvailable, layout, sidebarShown } from "./layout";
 import { Account } from "./library/sidebar";
 import { closeMainWindow, hasAppWindow } from "../platform/desktop";
+import { friendsCollapsed, toggleFriends } from "../state/friends-panel";
 import { sidebarCollapsed, toggleSidebar } from "../state/sidebar";
 import { ActionButton, IconButton, terminal } from "./ui/controls";
 import { controlsInTitleBar } from "./ui/title-bar";
@@ -141,6 +142,15 @@ export function TrailingControls() {
     <>
       <If when={desktop() && !terminal}>
         <SearchField />
+      </If>
+      {/* Folds the friend activity panel away, or brings it back. */}
+      <If when={friendsAvailable() && !terminal}>
+        <IconButton
+          name="user"
+          label={friendsCollapsed() ? "Show friend activity" : "Hide friend activity"}
+          hint
+          onPress={toggleFriends}
+        />
       </If>
       <AccountAction />
       <If when={controlsInTitleBar() && !sidebarShown()}>

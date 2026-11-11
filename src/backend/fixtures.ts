@@ -3,7 +3,7 @@
 // `demo: "rich"` host parameter, for performance runs) gives everything a
 // cover and makes the library as large as a real one.
 
-import type { Collection, Home, Item, Library, Lyrics, Track } from "./types";
+import type { Collection, Friend, Home, Item, Library, Lyrics, Track } from "./types";
 import cover00 from "./demo-covers/cover-00.jpg";
 import cover01 from "./demo-covers/cover-01.jpg";
 import cover02 from "./demo-covers/cover-02.jpg";
@@ -292,6 +292,16 @@ export function lyrics(trackUri: string): Lyrics {
   const track = ALL_TRACKS.find((t) => t.uri === trackUri);
   if (!track || track.artists === LOW_HARBOR.name) return { synced: false, lines: [], provider: "" };
   return { synced: true, provider: "Demo", lines: VERSES.map((words, i) => ({ startMs: i * 4000, words })) };
+}
+
+/** The demo's friends: two made-up people, one listening just now. */
+export function friends(): Friend[] {
+  const now = Date.now();
+  const track = ALL_TRACKS[0];
+  return [
+    { userId: "ada", name: "Ada", userImage: "", kind: "track", uri: track.uri, title: track.name, subtitle: `${track.artists} · ${track.album}`, image: "", timestamp: now - 60_000, playing: true },
+    { userId: "ben", name: "Ben", userImage: "", kind: "context", uri: PLAYLISTS[0] ? `spotify:playlist:${PLAYLISTS[0].id}` : "", title: PLAYLISTS[0]?.name ?? "", subtitle: "Ben", image: "", timestamp: now - 3_600_000, playing: false },
+  ];
 }
 
 /** The demo's ad: a made-up sponsor. */

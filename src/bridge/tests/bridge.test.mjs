@@ -599,3 +599,30 @@ test("lyricsOf reads timed and plain lines, and none", () => {
   assert.deepEqual(plain, { synced: false, provider: "lyricfind", lines: [{ startMs: 0, words: "Only words" }] });
   assert.deepEqual(B.lyricsOf(null), { synced: false, lines: [], provider: "" });
 });
+
+test("friendsOf reads tracks, episodes and playlists, newest first, and marks a recent listen as playing", () => {
+  const now = 1_000_000_000_000;
+  const friends = B.friendsOf(
+    {
+      friends: [
+        { user: { uri: "spotify:user:old", name: "Old" }, timestamp: now - 60 * 60 * 1000, playlist: { uri: "spotify:playlist:p", name: "Mix", owner: { name: "Ben" } } },
+        { friend: { user: { uri: "spotify:user:ada", name: "Ada", imageUrl: "a.jpg" }, timestamp: now - 1000, track: { uri: "spotify:track:t", name: "Song", artist: { name: "Band" }, album: { name: "LP", imageUrl: "lp.jpg" } } } },
+        { user: { uri: "spotify:user:cy", name: "Cy" }, timestamp: now - 2 * 60 * 1000, episode: { uri: "spotify:episode:e", name: "Ep", show: { name: "Show", imageUrl: "s.jpg" } } },
+        { user: { uri: "spotify:user:none", name: "Nothing" }, timestamp: now },
+        { timestamp: now },
+      ],
+    },
+    now,
+  );
+  assert.deepEqual(friends.map((f) => f.userId), ["ada", "cy", "old"]);
+  assert.deepEqual(friends[0], { userId: "ada", name: "Ada", userImage: "a.jpg", timestamp: now - 1000, playing: true, kind: "track", uri: "spotify:track:t", title: "Song", subtitle: "Band · LP", image: "lp.jpg" });
+  assert.equal(friends[1].kind, "episode");
+  assert.equal(friends[1].subtitle, "Show");
+  assert.equal(friends[1].image, "s.jpg");
+  assert.equal(friends[1].playing, true);
+  assert.equal(friends[2].kind, "context");
+  assert.equal(friends[2].subtitle, "Ben");
+  assert.equal(friends[2].playing, false);
+  assert.deepEqual(B.friendsOf(null, now), []);
+  assert.deepEqual(B.friendsOf({ friends: "nope" }, now), []);
+});

@@ -24,6 +24,18 @@ fn parse(text: &str) -> Value {
 }
 
 /// Made-up lyrics, timed every four seconds, for any track.
+/// The demo's friends: made-up people, each with a made-up listen a little
+/// before now.
+fn demo_friends() -> Value {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0.0, |d| d.as_millis() as f64);
+    json!({ "friends": [
+        { "userId": "ada", "name": "Ada", "userImage": "", "kind": "track", "uri": "spotify:track:demo1", "title": "Paper Boats", "subtitle": "Low Harbor · Noon", "image": "", "timestamp": now - 60_000.0, "playing": true },
+        { "userId": "ben", "name": "Ben", "userImage": "", "kind": "context", "uri": "spotify:playlist:demo2", "title": "Late Night Drive", "subtitle": "Ben", "image": "", "timestamp": now - 3_600_000.0, "playing": false },
+    ] })
+}
+
 fn demo_lyrics() -> Value {
     const WORDS: [&str; 12] = [
         "♪",
@@ -62,6 +74,7 @@ pub fn answer(command: &Command) -> Answer {
         Command::Me => Ok(json!({ "id": "demo", "name": "Demo Listener", "username": "demo", "image": "" })),
         Command::Colors(_) => Ok(json!({ "hex": "", "palette": [] })),
         Command::Lyrics(_) => Ok(demo_lyrics()),
+        Command::Friends => Ok(demo_friends()),
         Command::Library => {
             let home = parse(HOME);
             let mut items = vec![json!({

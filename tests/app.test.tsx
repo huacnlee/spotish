@@ -9,7 +9,9 @@ const LAUNCHED = { "firstRun:done": "1" };
 function desktop(params: Record<string, string | number | boolean> = {}, storage: Record<string, string> = LAUNCHED) {
   return open("../App.tsx", {
     platform: "linux",
-    width: 1280,
+    // Wide enough for the full player bar beside the sidebar and the friend
+    // activity panel.
+    width: 1700,
     height: 800,
     storage,
     host: { params: { backend: "demo", ...params } },
@@ -355,4 +357,31 @@ test("the music light switches to Current, and Random picks another for each tra
   // The next track brings another.
   await app.press("id:player >> role:button[Next]");
   await app.waitUntil(() => shown() !== undefined && shown() !== first);
+});
+
+test("the friend activity panel shows on the right, folds away, and stays out of a narrow window", async () => {
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  await app.waitFor("role:button[Hide friend activity]");
+  await app.waitFor("First Light");
+  expect(app.texts()).toContain("Friend Activity");
+
+  await app.press("role:button[Hide friend activity]");
+  await app.waitFor("role:button[Show friend activity]");
+  expect(app.texts()).not.toContain("Friend Activity");
+
+  await app.press("role:button[Show friend activity]");
+  await app.waitFor("First Light");
+
+  // Too narrow for a third column: no panel and no button.
+  const narrow = await open("../App.tsx", {
+    platform: "linux",
+    width: 900,
+    height: 800,
+    storage: LAUNCHED,
+    host: { params: { backend: "demo" } },
+  });
+  await narrow.waitFor("Good evening, Ada");
+  expect(narrow.texts()).not.toContain("Friend Activity");
+  expect(narrow.shows("role:button[Hide friend activity]")).toBe(false);
 });

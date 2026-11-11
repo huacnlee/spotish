@@ -117,6 +117,8 @@ pub enum Command {
     Colors(String),
     /// A track's lyrics, by its URI.
     Lyrics(String),
+    /// What the user's friends last listened to.
+    Friends,
 }
 
 impl Command {
@@ -146,6 +148,7 @@ impl Command {
             Command::PlayTrack(_) => "playTrack",
             Command::Colors(_) => "colors",
             Command::Lyrics(_) => "lyrics",
+            Command::Friends => "friends",
         }
     }
 
@@ -185,6 +188,7 @@ impl Command {
                 | Command::Me
                 | Command::Colors(_)
                 | Command::Lyrics(_)
+                | Command::Friends
         )
     }
 

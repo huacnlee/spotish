@@ -5,8 +5,9 @@
 import { View } from "nsh";
 import { Toolbar } from "nsh/base";
 import { Region } from "../components/ui/regions";
-import { barSize, railSidebar, sidebarShown, sidebarWidth } from "../components/layout";
+import { barSize, friendsShown, friendsWidth, railSidebar, sidebarShown, sidebarWidth } from "../components/layout";
 import { animateLayoutOn } from "../components/ui/motion";
+import { FriendPanel } from "../components/library/friends";
 import { Sidebar } from "../components/library/sidebar";
 import { PlayerBar } from "../components/player/player-bar";
 import { MainStack } from "./main";
@@ -17,7 +18,7 @@ import { NavControls, TrailingControls } from "../components/header";
 export function DesktopShell() {
   // Crossing a breakpoint, the sidebar and the player bar glide to their
   // new arrangement.
-  animateLayoutOn(() => `${sidebarWidth()}|${barSize()}`);
+  animateLayoutOn(() => `${sidebarWidth()}|${friendsWidth()}|${barSize()}`);
   return (
     <View class="flex-1">
       {/* The header's controls, after the name: one stop of Tab, Left and
@@ -46,6 +47,12 @@ export function DesktopShell() {
             </View>
           </If>
         </View>
+        {/* What friends are listening to, down the right. */}
+        <If when={friendsShown()}>
+          <View class="shrink-0" style={{ width: friendsWidth() - 8 }}>
+            <FriendPanel />
+          </View>
+        </If>
       </View>
     </View>
   );

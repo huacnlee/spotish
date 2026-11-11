@@ -4,6 +4,8 @@
 // its player bar keeps only what fits.
 
 import { platform, windowSize } from "nsh";
+import { friendsCollapsed } from "../state/friends-panel";
+import { signedIn } from "../state/session";
 import { sidebarCollapsed } from "../state/sidebar";
 
 export type Layout = "desktop" | "phone" | "terminal";
@@ -27,6 +29,10 @@ const SIDEBAR_MIDDLE = 228;
 /** The account panel's padding and border on each side (8 + 1). */
 const ACCOUNT_INSET = 2 * (8 + 1);
 const SHELL_GAPS = 3 * 8;
+/** The friend activity panel's width and the gap before it, and the window
+ * width from which it has room beside the sidebar and the pages. */
+const FRIENDS_WIDTH = 300;
+const FRIENDS_MIN_WINDOW = 1000;
 /** Narrower than this, a page in a browser gets the phone's layout. */
 const WEB_NARROW = 640;
 /** Narrower than this, the desktop's sidebar is a rail. */
@@ -46,7 +52,7 @@ export function layout(): Layout {
 /** How the desktop's player bar is laid out (tracked). */
 export const barSize = (): "full" | "compact" | "stacked" => {
   // The pages' width, which the bar floats over.
-  const w = windowSize().width - sidebarWidth() - (sidebarShown() ? SHELL_GAPS : 2 * 8);
+  const w = windowSize().width - sidebarWidth() - friendsWidth() - (sidebarShown() ? SHELL_GAPS : 2 * 8);
   return w < STACKED_BAR ? "stacked" : w < COMPACT_BAR ? "compact" : "full";
 };
 
@@ -61,6 +67,16 @@ export const sidebarShown = () => !sidebarCollapsed();
 /** The desktop sidebar's width now, pt (tracked). */
 export const sidebarWidth = () =>
   !sidebarShown() ? 0 : railSidebar() ? RAIL_WIDTH : windowSize().width < ALBUM_COLUMN ? SIDEBAR_MIDDLE : SIDEBAR_WIDE;
+
+/** Whether the desktop's friend activity panel has room (tracked): signed
+ * in, not folded away by the user, and a window wide enough. */
+export const friendsAvailable = () => layout() === "desktop" && signedIn() === true && windowSize().width >= FRIENDS_MIN_WINDOW;
+
+/** Whether the panel shows (tracked). */
+export const friendsShown = () => friendsAvailable() && !friendsCollapsed();
+
+/** The panel's width now, pt, with the gap before it (tracked). */
+export const friendsWidth = () => (friendsShown() ? FRIENDS_WIDTH + 8 : 0);
 
 /** The user menu's width, pt (tracked): the account row's, so it opens flush
  * with it; from the rail or the header, the wide sidebar's row. */

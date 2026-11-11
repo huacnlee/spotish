@@ -163,6 +163,25 @@ export interface Me {
   image: string;
 }
 
+/** One friend and what they last listened to. */
+export interface Friend {
+  userId: string;
+  name: string;
+  /** Their avatar URL, empty when there is none. */
+  userImage: string;
+  /** A track, an episode, or a context (a playlist, album or artist). */
+  kind: "track" | "episode" | "context" | string;
+  uri: string;
+  title: string;
+  /** The line under the title (artist and album, show, or owner). */
+  subtitle: string;
+  image: string;
+  /** When they listened, in ms since the epoch. */
+  timestamp: number;
+  /** Whether that was within the last five minutes. */
+  playing: boolean;
+}
+
 /** One line of lyrics. */
 export interface LyricLine {
   /** When it starts, ms into the track (0 when the lyrics are not timed). */
@@ -229,6 +248,10 @@ export interface Backend {
   coverColors(imageUrl: string): Promise<string[]>;
   /** A track's lyrics by URI (no lines when it has none). */
   lyrics(trackUri: string): Promise<Lyrics>;
+  /** What the signed-in user's friends last listened to, newest first (none
+   * when they follow nobody). Spotify's feed exposes only five friends at a
+   * time, so a load returns at most five. */
+  friends(): Promise<Friend[]>;
 
   // Controls: each sets a target state.
   toggle(): Promise<void>;
