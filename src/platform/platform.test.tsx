@@ -9,6 +9,7 @@ import { trayIcon, trayTitle } from "./desktop";
 import { themeFor } from "./theme";
 import { checkForUpdates, type Updater } from "./updater";
 import { colorScheme, setColorScheme, setTheme, token } from "nsh";
+import { isAvailable as canRestart } from "nsh/desktop";
 
 /** Every token theme.json defines a color for. */
 const COLOR_TOKENS = [
@@ -122,27 +123,90 @@ describe("updates", () => {
     expect(said).toEqual([]);
   });
 
-  /** An app update of `version` through a fake `nsh/updater`; `steps` gets
-   * each call and message in order. */
-  function fakeUpdater(version: string, steps: string[], fail: { download?: boolean; install?: boolean } = {}): Updater {
+  /** A release in the fake source's manifest. */
+  interface Release {
+    version: string;
+    sha256: string;
+  }
+
+  interface Source {
+    release: Release | null;
+    check?: () => Promise<Release | null>;
+    pkg: string | null;
+  }
+
+  /** A fake `nsh/updater` that keeps its download as NSH's runtime does
+   * (`checkForUpdate` keeps it for the same version and SHA-256 only, one
+   * operation at a time). `steps` gets each call and message in order;
+   * `source.release` is what the manifest offers, `source.check` replaces
+   * a check, `source.pkg` is the OTA package the manifest offers. */
+  function fakeUpdater(
+    release: Release | null,
+    steps: string[],
+    fail: { download?: boolean; install?: boolean } = {},
+  ): Updater & { source: Source } {
+    const source: Source = { release, pkg: null };
+    let pending: Release | null = null;
+    let archive: string | null = null;
+    let nextPackage: string | null = null;
+    let busy = false;
+    async function operation<T>(work: () => Promise<T>): Promise<T> {
+      if (busy) throw new Error("an update operation is already in progress");
+      busy = true;
+      try {
+        return await work();
+      } finally {
+        busy = false;
+      }
+    }
     return {
-      checkForPackage: async () => null,
-      downloadPackage: async () => undefined,
-      restartToPackage: async () => undefined,
-      checkForUpdate: async () => {
-        steps.push("check");
-        return { version, notes: null, url: `https://example.invalid/spotish-${version}.tar.gz`, canInstall: true };
-      },
-      downloadUpdate: async () => {
-        steps.push("download");
-        if (fail.download) throw new Error("HTTP 503");
-      },
-      installAndRestart: async () => {
-        steps.push("install");
-        if (fail.install) throw new Error("its code signature is not valid");
-        return new Promise<void>(() => undefined); // Restarts: never settles.
-      },
-    } as unknown as Updater;
+      source,
+      checkForPackage: () =>
+        operation(async () => {
+          const pkg = source.pkg;
+          return pkg && { version: pkg, build: 2, notes: null, size: null };
+        }),
+      // The package stays on disk until the app restarts into it.
+      downloadPackage: () =>
+        operation(async () => {
+          steps.push("download package");
+          nextPackage = source.pkg;
+        }),
+      restartToPackage: () =>
+        operation(async () => {
+          if (!nextPackage) throw new Error("nothing is downloaded: call downloadPackage first");
+          steps.push(`restart into ${nextPackage}`);
+          return new Promise<void>(() => undefined);
+        }),
+      checkForUpdate: () =>
+        operation(async () => {
+          steps.push("check");
+          const found = source.check ? await source.check() : source.release;
+          if (!found) {
+            pending = archive = null;
+            return null;
+          }
+          if (pending?.version !== found.version || pending.sha256 !== found.sha256) {
+            pending = found;
+            archive = null;
+          }
+          const url = `https://example.invalid/spotish-${found.version}.tar.gz`;
+          return { version: found.version, notes: null, url, canInstall: true };
+        }),
+      downloadUpdate: () =>
+        operation(async () => {
+          steps.push("download");
+          if (fail.download) throw new Error("HTTP 503");
+          archive = pending && `${pending.version}/${pending.sha256}`;
+        }),
+      installAndRestart: () =>
+        operation(async () => {
+          if (!archive) throw new Error("nothing is downloaded: call downloadUpdate first");
+          steps.push(`install ${archive}`);
+          if (fail.install) throw new Error("its code signature is not valid");
+          return new Promise<void>(() => undefined); // Restarts: never settles.
+        }),
+    } as unknown as Updater & { source: Source };
   }
 
   /** A `notify` that logs into `steps` and keeps the last action. */
@@ -163,42 +227,172 @@ describe("updates", () => {
 
   test("an app update is downloaded before it is offered, and Restart only installs it", async () => {
     const steps: string[] = [];
-    const updater = fakeUpdater("9.0.0", steps);
+    const updater = fakeUpdater({ version: "9.0.0", sha256: "a" }, steps);
     const { last, opts } = recorder(steps);
     await checkForUpdates(opts, updater);
     expect(steps).toEqual(["check", "download", "Spotish 9.0.0 is ready. [Restart]"]);
     last.action?.run();
     await settle();
-    expect(steps.slice(3)).toEqual(["Updating to Spotish 9.0.0…", "install"]);
+    expect(steps.slice(3)).toEqual(["Updating to Spotish 9.0.0…", "install 9.0.0/a"]);
   });
 
   test("a later check offers the downloaded version again without downloading it again", async () => {
     const steps: string[] = [];
-    const updater = fakeUpdater("9.1.0", steps);
-    const { opts } = recorder(steps);
+    const updater = fakeUpdater({ version: "9.1.0", sha256: "a" }, steps);
+    const { last, opts } = recorder(steps);
     await checkForUpdates(opts, updater);
     await checkForUpdates(opts, updater);
     expect(steps.filter((s) => s === "download")).toHaveLength(1);
     expect(steps.at(-1)).toBe("Spotish 9.1.0 is ready. [Restart]");
+    last.action?.run();
+    await settle();
+    expect(steps.at(-1)).toBe("install 9.1.0/a");
+  });
+
+  test("a new archive of the same version is downloaded on Restart, and installed", async () => {
+    const steps: string[] = [];
+    const updater = fakeUpdater({ version: "9.2.0", sha256: "a" }, steps);
+    const { last, opts } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    // The release's archive is replaced: the runtime drops the download,
+    // which the app cannot see (`checkForUpdate` reports no SHA-256).
+    updater.source.release = { version: "9.2.0", sha256: "b" };
+    await checkForUpdates(opts, updater);
+    last.action?.run();
+    await settle();
+    expect(steps.slice(3)).toEqual([
+      "check",
+      "Spotish 9.2.0 is ready. [Restart]",
+      "Updating to Spotish 9.2.0…",
+      "Downloading Spotish 9.2.0…",
+      "download",
+      "Updating to Spotish 9.2.0…",
+      "install 9.2.0/b",
+    ]);
+  });
+
+  test("Restart from an older offer does nothing once a later check offers a newer version", async () => {
+    const steps: string[] = [];
+    const updater = fakeUpdater({ version: "9.3.0", sha256: "a" }, steps);
+    const { last, opts } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    const older = last.action;
+    updater.source.release = { version: "9.4.0", sha256: "a" };
+    await checkForUpdates(opts, updater);
+    older?.run();
+    await settle();
+    expect(steps.some((s) => s.startsWith("install") || s.startsWith("Updating"))).toBe(false);
+    last.action?.run();
+    await settle();
+    expect(steps.slice(-2)).toEqual(["Updating to Spotish 9.4.0…", "install 9.4.0/a"]);
+  });
+
+  test("Restart during a check waits for it, and installs when it fails", async () => {
+    const steps: string[] = [];
+    const updater = fakeUpdater({ version: "9.5.0", sha256: "a" }, steps);
+    const { last, opts } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    let fail = (_: Error) => undefined as void;
+    updater.source.check = () => new Promise((_, reject) => (fail = reject));
+    const checking = checkForUpdates(opts, updater);
+    last.action?.run();
+    await settle();
+    // Nothing collides with the check, which holds the updater.
+    expect(steps.slice(3)).toEqual(["check"]);
+    fail(new Error("offline")); // A failed check keeps the download.
+    await checking;
+    await settle();
+    expect(steps.slice(4)).toEqual(["Updating to Spotish 9.5.0…", "install 9.5.0/a"]);
+  });
+
+  test("Restart during a check that finds the release gone does nothing", async () => {
+    const steps: string[] = [];
+    const updater = fakeUpdater({ version: "9.6.0", sha256: "a" }, steps);
+    const { last, opts } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    let resolve = (_: Release | null) => undefined as void;
+    updater.source.check = () => new Promise((done) => (resolve = done));
+    const checking = checkForUpdates(opts, updater);
+    last.action?.run();
+    await settle();
+    resolve(null);
+    await checking;
+    await settle();
+    expect(steps.slice(3)).toEqual(["check"]);
   });
 
   test("a download that fails offers the release's page instead", async () => {
     const steps: string[] = [];
     const { last, opts } = recorder(steps);
-    await checkForUpdates(opts, fakeUpdater("9.2.0", steps, { download: true }));
-    expect(steps).toEqual(["check", "download", "Spotish 9.2.0 is available. [Download]"]);
+    await checkForUpdates(opts, fakeUpdater({ version: "9.7.0", sha256: "a" }, steps, { download: true }));
+    expect(steps).toEqual(["check", "download", "Spotish 9.7.0 is available. [Download]"]);
     expect(last.action?.label).toBe("Download");
   });
 
-  test("an install that fails says so", async () => {
+  test("an install that fails says so, and the next check downloads again", async () => {
     const steps: string[] = [];
+    const updater = fakeUpdater({ version: "9.8.0", sha256: "a" }, steps, { install: true });
     const { last, opts } = recorder(steps);
-    await checkForUpdates(opts, fakeUpdater("9.3.0", steps, { install: true }));
+    await checkForUpdates(opts, updater);
     last.action?.run();
     await settle();
-    expect(steps.slice(3)).toEqual(["Updating to Spotish 9.3.0…", "install", "The update could not be installed."]);
-    // The next check downloads it again rather than offering what may be gone.
-    await checkForUpdates(opts, fakeUpdater("9.3.0", steps));
-    expect(steps.slice(6)).toEqual(["check", "download", "Spotish 9.3.0 is ready. [Restart]"]);
+    expect(steps.slice(3)).toEqual(["Updating to Spotish 9.8.0…", "install 9.8.0/a", "The update could not be installed."]);
+    await checkForUpdates(opts, updater);
+    expect(steps.slice(6)).toEqual(["check", "download", "Spotish 9.8.0 is ready. [Restart]"]);
+  });
+
+  test("Restart from an older app offer does nothing once a later check finds a package", async () => {
+    const steps: string[] = [];
+    const updater = fakeUpdater({ version: "9.9.0", sha256: "a" }, steps);
+    const { opts, last } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    const older = last.action;
+    updater.source.pkg = "9.9.1";
+    await checkForUpdates(opts, updater);
+    older?.run();
+    await settle();
+    expect(steps.some((s) => s.startsWith("install") || s.startsWith("Updating"))).toBe(false);
+    expect(steps.slice(3, 4)).toEqual(["download package"]);
+  });
+
+  test("Restart from an older package offer does nothing once a later check offers an app update", async () => {
+    if (!canRestart) return; // No package Restart is offered where the app cannot restart.
+    const steps: string[] = [];
+    const updater = fakeUpdater(null, steps);
+    updater.source.pkg = "9.10.0";
+    const { opts, last } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    expect(steps).toEqual(["download package", "Spotish 9.10.0 is ready. [Restart]"]);
+    const older = last.action;
+    updater.source.pkg = null;
+    updater.source.release = { version: "9.11.0", sha256: "a" };
+    await checkForUpdates(opts, updater);
+    older?.run();
+    await settle();
+    expect(steps.some((s) => s.startsWith("restart into"))).toBe(false);
+    last.action?.run();
+    await settle();
+    expect(steps.slice(-2)).toEqual(["Updating to Spotish 9.11.0…", "install 9.11.0/a"]);
+  });
+
+  test("Restart into a package during a check waits for it, and restarts when it fails", async () => {
+    if (!canRestart) return;
+    const steps: string[] = [];
+    const updater = fakeUpdater(null, steps);
+    updater.source.pkg = "9.12.0";
+    const { opts, last } = recorder(steps);
+    await checkForUpdates(opts, updater);
+    updater.source.pkg = null;
+    let fail = (_: Error) => undefined as void;
+    updater.source.check = () => new Promise((_, reject) => (fail = reject));
+    const checking = checkForUpdates(opts, updater);
+    last.action?.run();
+    await settle();
+    // Nothing collides with the check, which holds the updater.
+    expect(steps.slice(2)).toEqual(["check"]);
+    fail(new Error("offline"));
+    await checking;
+    await settle();
+    expect(steps.slice(3)).toEqual(["restart into 9.12.0"]);
   });
 });
