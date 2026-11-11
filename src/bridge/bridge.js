@@ -798,10 +798,10 @@
         const firstEntries = need(op, data, "playlistV2.content.items", warn);
         const entries = firstEntries.concat(
           await morePages(
-            firstEntries.length,
+            offset + firstEntries.length,
             p.content.totalCount || 0,
             async (more) => need(op, await gql(op, { uri, offset: more, limit: 100, enableWatchFeedEntrypoint: false }), "playlistV2.content.items", warn),
-            { warn },
+            { warn, size: firstEntries.length },
           ),
         );
         const tracks = entries.map((i) => track(unwrap(i.itemV2), i.uid)).filter(Boolean);
@@ -872,10 +872,10 @@
         const firstItems = need(op, data, "me.library.tracks.items", warn);
         const items = firstItems.concat(
           await morePages(
-            firstItems.length,
+            offset + firstItems.length,
             t.totalCount || 0,
             async (more) => need(op, await gql(op, { offset: more, limit: 100 }), "me.library.tracks.items", warn),
-            { warn },
+            { warn, size: firstItems.length },
           ),
         );
         const tracks = likedTracks(items);
