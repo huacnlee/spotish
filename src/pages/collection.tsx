@@ -8,6 +8,8 @@ import type { Collection } from "../backend/types";
 import { AppPage } from "../components/page";
 import { layout, pageEnd, playerOverlap, wideTracks } from "../components/layout";
 import { CardGrid } from "../components/library/cards";
+import { sortTracks, trackReversed, trackSort, trackView } from "../components/library/track-sort";
+import { TrackSortMenu } from "../components/library/track-sort-menu";
 import { TrackHeader, TrackRow } from "../components/library/tracks";
 import {
   Cover,
@@ -131,6 +133,14 @@ function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
   // What plays is found among these when the player can't name it.
   effect(() => rememberTracks(props.uri, props.data.tracks));
   const artist = () => props.data.header.kind === "artist";
+  // A playlist and Liked Songs can be sorted and shown compact; an album
+  // and an artist's page keep their own order and look.
+  const sortable = () => props.data.header.kind === "playlist" || props.data.header.kind === "collection";
+  // The tracks in the chosen order; every row index below counts in it.
+  const tracks = () => (sortable() ? sortTracks(props.data.tracks, trackSort(), trackReversed()) : props.data.tracks);
+  const compact = () => sortable() && trackView() === "compact" && !terminal;
+  // A row's height, which the list's estimate and the keyboard's scroll use.
+  const rowSize = () => (compact() ? 36 : 48);
   const showAlbum = () => wideTracks() && !artist();
   // The rows wave in, top to bottom, when this page opens (not when it is
   // gone back to): at once when cached, as the skeleton fades when they
@@ -148,7 +158,7 @@ function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
     }),
   );
   const play = (index: number) => {
-    const track = props.data.tracks[index];
+    const track = tracks()[index];
     if (track && ready()) playFrom(props.uri, track.uri, track);
   };
   // The list is one stop of Tab; the arrows move through its rows, Return
@@ -166,19 +176,19 @@ function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
   const toTop = () => list?.scrollToOffset({ offset: 0, animated: !reduceMotion() });
   const toEnd = () => list?.scrollToEnd({ animated: !reduceMotion() });
   const keys = createListKeys({
-    count: () => props.data.tracks.length,
+    count: () => tracks().length,
     group,
     order: () => 1,
     activate: play,
     // Rows are 48pt; the player floats over the bottom of the page.
     cover: { inset: playerOverlap, itemSize: 48 },
-    start: () => props.data.tracks.findIndex((t) => isCurrentTrack(t.uri)),
+    start: () => tracks().findIndex((t) => isCurrentTrack(t.uri)),
   });
   return (
     <List
-      each={props.data.tracks}
+      each={tracks()}
       keyExtractor={(t) => t.uid + t.uri}
-      estimatedItemSize={48}
+      estimatedItemSize={rowSize()}
       ref={(n: ListRef) => {
         list = n;
         keys.ref(n);
@@ -191,6 +201,9 @@ function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
       header={() => (
         <View>
           <Header uri={props.uri} data={props.data} entrance={props.instant} group={group} reveal={toTop} />
+          <If when={sortable()}>
+            <TrackSortMenu />
+          </If>
           <TrackHeader showAlbum={showAlbum()} />
         </View>
       )}
@@ -213,6 +226,7 @@ function Tracks(props: { uri: string; data: Collection; instant: boolean }) {
           number={index()}
           showAlbum={showAlbum()}
           secondary={artist() ? "album" : "artists"}
+          compact={compact()}
           disabled={!ready()}
           wave={wave}
           keys={keys}

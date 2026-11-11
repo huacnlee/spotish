@@ -46,6 +46,9 @@ export function TrackRow(props: {
    * repeat down the list. */
   secondary?: "artists" | "album";
   disabled?: boolean;
+  /** The compact view: a shorter row with no cover, the artists beside the
+   * title. */
+  compact?: boolean;
   /** The list's wave: the row comes in with it each time the page is
    * entered, and on its own when it is scrolled into view. */
   wave?: ListWave;
@@ -86,7 +89,7 @@ export function TrackRow(props: {
       class={`${
         terminal
           ? "flex-row gap-2 px-1 focus:bg-muted selected:bg-muted"
-          : `group mx-3 h-12 flex-row items-center gap-3 rounded-(--radius) px-3 transition duration-150 ease-out hover:bg-row-hover active:bg-muted selected:bg-row-hover disabled:opacity-50 motion-reduce:transition-none ${focusRing}`
+          : `group mx-3 ${props.compact ? "h-9" : "h-12"} flex-row items-center gap-3 rounded-(--radius) px-3 transition duration-150 ease-out hover:bg-row-hover active:bg-muted selected:bg-row-hover disabled:opacity-50 motion-reduce:transition-none ${focusRing}`
       } ${keyed() ? keyRing : ""}`}
       classList={{ "opacity-45": !!props.track && !props.track.playable }}
       style={entrance}
@@ -110,12 +113,14 @@ export function TrackRow(props: {
           <PlayingBars playing={playing()} />
         </If>
       </View>
-      <View style={coverIn}>
-        <Cover src={props.track?.image ?? ""} size={36} fallback="music" class="rounded-sm" />
-      </View>
-      <View class={terminal ? "min-w-0 flex-1 flex-row gap-2" : "min-w-0 flex-1 gap-0.5"} style={textIn}>
-        <Text class={`line-clamp-1 text-sm text-foreground ${current() ? "font-semibold" : "font-medium"}`}>{props.track?.name ?? ""}</Text>
-        <View class="flex-row items-center gap-1.5">
+      <If when={!props.compact}>
+        <View style={coverIn}>
+          <Cover src={props.track?.image ?? ""} size={36} fallback="music" class="rounded-sm" />
+        </View>
+      </If>
+      <View class={terminal || props.compact ? "min-w-0 flex-1 flex-row items-center gap-3" : "min-w-0 flex-1 gap-0.5"} style={textIn}>
+        <Text class={`line-clamp-1 text-sm text-foreground ${props.compact ? "flex-1" : ""} ${current() ? "font-semibold" : "font-medium"}`}>{props.track?.name ?? ""}</Text>
+        <View class={`flex-row items-center gap-1.5 ${props.compact ? "flex-1" : ""}`}>
           <If when={!!props.track?.explicit && !terminal}>
             <Text accessibilityLabel="Explicit" class="rounded-sm bg-muted-foreground px-1 text-[9px] font-bold text-background">
               E
