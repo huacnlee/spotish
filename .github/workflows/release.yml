@@ -47,24 +47,21 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
-      # Spotish follows NSH's main: the nightly CLI, as in CI (https://nsh.dev/docs/installation).
-      - name: Install the NSH CLI (nightly)
+      # Use the same stable NSH release as Cargo.toml.
+      - name: Install the NSH CLI (0.5.0)
         if: runner.os != 'Windows'
         run: |
-          curl -fsSL https://nsh.dev/install.sh | sh -s -- --nightly
+          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Install the NSH CLI (nightly, Windows)
+      - name: Install the NSH CLI (0.5.0, Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $env:NSH_VERSION = 'nightly'
+          $env:NSH_VERSION = 'v0.5.0'
           irm https://nsh.dev/install.ps1 | iex
           Add-Content $env:GITHUB_PATH (Join-Path $env:LOCALAPPDATA 'nsh\bin')
 
-      # The hosts the CLI generates call the API of the commit it was built from, and the app's crate links the one
-      # Cargo.lock holds (see CONTRIBUTING.md). The nightly tag moves with NSH's main, so it can part from the lock:
-      # a release then stops (move the lock with `cargo update -p nsh-core --precise <nightly hash>` and tag again);
-      # a run by hand only warns. Checked in every job: the nightly can move between them.
+      # Reject a CLI that differs from the locked runtime.
       - name: Compare the CLI with the locked NSH
         run: |
           # Windows checkouts may end lines with CRLF.
@@ -72,12 +69,10 @@ jobs:
           locked="$(tr -d '\r' < Cargo.lock | grep -A2 '^name = "nsh-core"$' | sed -n 's/^source = ".*#\([0-9a-f]*\)"$/\1/p')"
           echo "nsh CLI: $cli, Cargo.lock: $locked"
           [ -n "$cli" ] && [ -n "$locked" ] || { echo "::error::Could not read the CLI or the locked NSH commit."; exit 1; }
+          [ -n "$cli" ] && [ -n "$locked" ] || exit 1
           case "$locked" in
             "$cli"*) ;;
-            *)
-              message="The nightly nsh CLI ($cli) is not the NSH commit Cargo.lock holds ($locked); run cargo update -p nsh-core --precise <nightly hash>."
-              if [ "$GITHUB_REF_TYPE" = tag ]; then echo "::error::$message"; exit 1; fi
-              echo "::warning::$message" ;;
+            *) echo "::error::NSH CLI ($cli) differs from Cargo.lock ($locked)."; exit 1 ;;
           esac
 
       - name: Package
@@ -152,9 +147,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Install the NSH CLI (nightly)
+      - name: Install the NSH CLI (0.5.0)
         run: |
-          curl -fsSL https://nsh.dev/install.sh | sh -s -- --nightly
+          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - uses: actions/download-artifact@v4
         with:

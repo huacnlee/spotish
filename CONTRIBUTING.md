@@ -16,32 +16,24 @@ demand play, skips) will not be merged. Point listeners to Spotify Premium inste
 
 1. **Rust** through [rustup](https://rustup.rs), and on Linux GTK 4.14+ development packages (see NSH's
    [installation guide](https://nsh.dev/docs/installation.md)).
-2. **The `nsh` CLI, nightly.** Spotish follows NSH's `main` branch. Install the nightly build (macOS arm64, Linux
-   x86_64; Windows: `$env:NSH_VERSION="nightly"; irm https://nsh.dev/install.ps1 | iex`):
+2. **The `nsh` CLI, version 0.5.0.** Install the release matching the app's crates:
 
    ```sh
-   curl -fsSL https://nsh.dev/install.sh | sh -s -- --nightly
-   nsh --version    # e.g. "nsh 0.4.0 (f81b965)": the commit it was built from
+   curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
+   nsh --version    # nsh 0.5.0 (f4d68f7)
    ```
+
+   On Windows: `$env:NSH_VERSION="v0.5.0"; irm https://nsh.dev/install.ps1 | iex`.
 
 3. **A browser with Widevine**: Google Chrome, Chromium, Microsoft Edge or Brave. Only needed to play music, not for
    demo mode or the tests.
 
 ### How Spotish depends on NSH
 
-`Cargo.toml` takes NSH's crates from Git, from its `main` branch:
-
-```toml
-nsh-core = { git = "https://github.com/longbridge/nsh", branch = "main" }
-```
-
-`Cargo.lock` holds the commit. The `nsh` CLI generates its hosts from the same Git checkout Cargo resolved, so the app
-and its hosts share one `nsh-core`. The locked commit must be the one your CLI was built from (the hash
-`nsh --version` prints): the code the CLI generates calls that commit's API. The `nightly` tag moves with NSH's
-`main`; to follow it, reinstall the CLI, run `cargo update -p nsh-core` (it takes `main`'s latest commit, so do it
-soon after the nightly is published; `cargo update -p nsh-core --precise <hash>` takes the exact commit
-`git ls-remote https://github.com/longbridge/nsh refs/tags/nightly` prints), and run `nsh check` and `nsh test`. CI
-warns when the nightly CLI and the locked commit differ.
+`Cargo.toml` pins NSH's crates to the `v0.5.0` Git tag. `Cargo.lock` holds the exact commit.
+CI and release packaging install the same CLI version and reject a commit mismatch.
+When upgrading NSH, update the tag, lockfile and CLI version in both workflows together,
+then run the checks below.
 
 To work against a local NSH checkout instead (for example while changing NSH itself), point the `nsh-*` lines at it
 with `path = "../nsh/crates/nsh-core"` (and so on) and use a CLI built from that checkout. Do not commit that change:
