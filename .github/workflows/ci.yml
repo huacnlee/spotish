@@ -58,6 +58,12 @@ jobs:
       - name: nsh check
         run: nsh check
 
+      - name: nsh build
+        run: nsh build
+
+      - name: cargo clippy
+        run: cargo clippy --all-targets -- -D warnings
+
       - name: nsh test
         run: nsh test
 
