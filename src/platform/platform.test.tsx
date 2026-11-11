@@ -355,8 +355,11 @@ describe("updates", () => {
     expect(steps.slice(3, 4)).toEqual(["download package"]);
   });
 
-  test("Restart from an older package offer does nothing once a later check offers an app update", async () => {
-    if (!canRestart) return; // No package Restart is offered where the app cannot restart.
+  // No package Restart is offered where the app cannot restart: these
+  // report as skipped there instead of passing without running.
+  const restartTest = canRestart ? test : test.skip;
+
+  restartTest("Restart from an older package offer does nothing once a later check offers an app update", async () => {
     const steps: string[] = [];
     const updater = fakeUpdater(null, steps);
     updater.source.pkg = "9.10.0";
@@ -375,8 +378,7 @@ describe("updates", () => {
     expect(steps.slice(-2)).toEqual(["Updating to Spotish 9.11.0…", "install 9.11.0/a"]);
   });
 
-  test("Restart into a package during a check waits for it, and restarts when it fails", async () => {
-    if (!canRestart) return;
+  restartTest("Restart into a package during a check waits for it, and restarts when it fails", async () => {
     const steps: string[] = [];
     const updater = fakeUpdater(null, steps);
     updater.source.pkg = "9.12.0";
