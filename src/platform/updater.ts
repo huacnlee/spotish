@@ -61,10 +61,32 @@ export type Updater = Pick<
   "checkForPackage" | "checkForUpdate" | "downloadPackage" | "downloadUpdate" | "installAndRestart" | "restartToPackage"
 >;
 
-let checking = false;
-/** The app version whose archive is downloaded and verified, waiting for
- * the user's Restart; `undefined` until one is. */
-let downloaded: string | undefined;
+/** Where the updates of one `nsh/updater` stand (tests pass their own). */
+interface State {
+  /** The check in progress, if any: it holds `nsh/updater`, which runs one
+   * operation at a time. */
+  checking?: Promise<void>;
+  /** Whether Restart is installing an app update or restarting into a
+   * package (the app is about to quit). */
+  installing: boolean;
+  /** The app update downloaded and verified, waiting for the user's
+   * Restart: its version and archive URL. `checkForUpdate` keeps the
+   * download of the same version only while the manifest's archive (its
+   * SHA-256, which it does not report) stays the same, so `restart`
+   * downloads again when it finds the download gone. */
+  downloaded?: { version: string; url: string };
+  /** The latest update (package or app) a check found; a newer check
+   * replaces it, so a Restart from an older message does nothing. */
+  offered: number;
+}
+
+const states = new WeakMap<Updater, State>();
+
+function stateOf(updater: Updater): State {
+  let state = states.get(updater);
+  if (!state) states.set(updater, (state = { installing: false, offered: 0 }));
+  return state;
+}
 
 /**
  * Checks for a newer build of the app's TSX (downloaded, it runs from the
@@ -77,38 +99,54 @@ let downloaded: string | undefined;
  * Resolves when done; never rejects. In development runs and on the web
  * it finds nothing.
  */
-export async function checkForUpdates(opts: UpdateOptions, updater: Updater = nshUpdater): Promise<void> {
-  if (checking) return;
-  checking = true;
+export function checkForUpdates(opts: UpdateOptions, updater: Updater = nshUpdater): Promise<void> {
+  const state = stateOf(updater);
+  if (state.checking || state.installing) return Promise.resolve();
+  const check = runCheck(state, opts, updater).finally(() => {
+    state.checking = undefined;
+  });
+  state.checking = check;
+  return check;
+}
+
+async function runCheck(state: State, opts: UpdateOptions, updater: Updater): Promise<void> {
   try {
     const pkg = await updater.checkForPackage();
     if (pkg) {
       await updater.downloadPackage();
+      // The package replaces what an earlier check offered: it runs from
+      // the next start.
+      const offer = ++state.offered;
       if (canRestart) {
         opts.notify(`Spotish ${pkg.version} is ready.`, {
           label: "Restart",
-          run: () => void updater.restartToPackage().catch((e: unknown) => console.warn("update: restart failed:", e)),
+          run: () => void restart(state, offer, () => restartToPackage(updater)),
         });
       }
       return;
     }
     const app = await updater.checkForUpdate();
+    // What this check found replaces what an earlier one offered.
+    const offer = ++state.offered;
+    // `checkForUpdate` drops its download when it finds no update it can
+    // install.
+    if (!app?.canInstall) state.downloaded = undefined;
     if (!app) return;
     if (app.canInstall) {
-      // The same version found again keeps its download (`checkForUpdate`):
-      // a later check only offers it again.
-      if (downloaded !== app.version) {
+      const same = state.downloaded?.version === app.version && state.downloaded.url === app.url;
+      if (!same) {
+        state.downloaded = undefined;
         try {
           await updater.downloadUpdate();
-          downloaded = app.version;
+          state.downloaded = { version: app.version, url: app.url };
         } catch (error) {
           console.warn("update: download failed:", error);
         }
       }
-      if (downloaded === app.version) {
+      if (state.downloaded) {
         opts.notify(`Spotish ${app.version} is ready.`, {
           label: "Restart",
-          run: () => void installApp(app.version, opts, updater),
+          run: () => void restart(state, offer, () => installApp(state, app.version, opts, updater)),
         });
         return;
       }
@@ -119,21 +157,49 @@ export async function checkForUpdates(opts: UpdateOptions, updater: Updater = ns
     });
   } catch (error) {
     console.warn("update check failed:", error);
-  } finally {
-    checking = false;
   }
 }
 
-async function installApp(version: string, opts: UpdateOptions, updater: Updater): Promise<void> {
-  // Unpacking and checking the new app takes a few seconds before it quits.
-  opts.notify(`Updating to Spotish ${version}…`);
+/** Runs `go` for the Restart of the offer `offer`, unless a later check
+ * offered something else or a Restart is already under way. */
+async function restart(state: State, offer: number, go: () => Promise<void>): Promise<void> {
+  if (state.installing) return;
+  // A check in progress holds the updater; it may also find something
+  // newer, which it offers in its own message.
+  await state.checking;
+  if (offer !== state.offered || state.installing) return;
+  state.installing = true;
   try {
-    await updater.installAndRestart(); // Settles only on failure.
+    await go(); // Settles only on failure.
+  } finally {
+    state.installing = false;
+  }
+}
+
+async function restartToPackage(updater: Updater): Promise<void> {
+  await updater.restartToPackage().catch((e: unknown) => console.warn("update: restart failed:", e));
+}
+
+async function installApp(state: State, version: string, opts: UpdateOptions, updater: Updater): Promise<void> {
+  try {
+    // Unpacking and checking the new app takes a few seconds before it quits.
+    opts.notify(`Updating to Spotish ${version}…`);
+    try {
+      await updater.installAndRestart(); // Settles only on failure.
+    } catch (error) {
+      // A later check of the same version found a different archive, and
+      // dropped this one: download that one now, then install it.
+      if (!String(error).includes("nothing is downloaded")) throw error;
+      state.downloaded = undefined;
+      opts.notify(`Downloading Spotish ${version}…`);
+      await updater.downloadUpdate();
+      opts.notify(`Updating to Spotish ${version}…`);
+      await updater.installAndRestart();
+    }
   } catch (error) {
     console.warn("update: install failed:", error);
-    // The next check downloads it again (`checkForUpdate` may have
-    // dropped this download for a different archive of the version).
-    if (downloaded === version) downloaded = undefined;
+    // The next check downloads it again.
+    state.downloaded = undefined;
     opts.notify("The update could not be installed.");
   }
 }
