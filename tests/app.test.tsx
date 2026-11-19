@@ -430,3 +430,21 @@ test("choosing the sort in use again runs it the other way", async () => {
   const second = app.texts();
   expect(second.indexOf(down[0].name)).toBeLessThan(second.indexOf(up[0].name));
 });
+
+test("library folders open in place and show the folders inside them", async () => {
+  const app = await desktop();
+  await app.waitFor("Good evening, Ada");
+  await app.waitFor("role:button[Road Trips, folder, collapsed]");
+  expect(app.shows("role:button[Night Drives, folder, collapsed]")).toBe(false);
+
+  await app.press("role:button[Road Trips, folder, collapsed]");
+  await app.waitFor("role:button[Night Drives, folder, collapsed]");
+  await app.press("role:button[Night Drives, folder, collapsed]");
+  await app.waitFor("role:button[Night Drives, folder, expanded]");
+  // A folder stays on the page it was on.
+  expect(app.texts()).toContain("Good evening, Ada");
+
+  await app.press("role:button[Road Trips, folder, expanded]");
+  await app.waitFor("role:button[Road Trips, folder, collapsed]");
+  expect(app.shows("role:button[Night Drives, folder, expanded]")).toBe(false);
+});

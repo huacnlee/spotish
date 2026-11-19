@@ -89,7 +89,7 @@ export const EMPTY_PLAYER: PlayerState = {
 // ---- Data ----------------------------------------------------------------
 
 /** What an item is. */
-export type ItemKind = "playlist" | "album" | "artist" | "show" | "collection" | "track";
+export type ItemKind = "playlist" | "album" | "artist" | "show" | "collection" | "track" | "folder";
 
 /** A playlist, album, artist, show, Liked Songs or a track shown as a card. */
 export interface Item {
@@ -98,6 +98,10 @@ export interface Item {
   name: string;
   subtitle: string;
   image: string;
+  /** In the library: how deep it sits in folders (0: the top). */
+  depth?: number;
+  /** In the library: the folder it sits in ("" at the top). */
+  parent?: string;
 }
 
 /** A track in a list. */

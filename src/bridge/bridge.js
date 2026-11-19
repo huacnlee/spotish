@@ -37,7 +37,7 @@
   "use strict";
 
   const PROTOCOL = 1;
-  const REVISION = 8;
+  const REVISION = 9;
   // Liked Songs' cover: the library reports it; the tracks query does not.
   const LIKED_IMAGE = "https://misc.scdn.co/liked-songs/liked-songs-640.png";
   let likedImage = "";
@@ -225,6 +225,42 @@
       }
     }
     if (o.warn && total > end) o.warn("[spotish] list cut at " + end + " of " + total);
+    return out;
+  };
+  // The library as Spotify's sidebar shows it: a flat list in tree order,
+  // each entry with its `depth` and the `parent` folder it sits in ("" at
+  // the top). `load(folderUri)` resolves to the `data` of one level's
+  // entries (null: the top level); `toItem` maps an entry that is not a
+  // folder. A folder (`spotify:user:…:folder:…`) is followed by its own
+  // entries, read one folder at a time up to `maxFolders`; a folder that
+  // fails to load stays, empty, and is warned of.
+  const isFolder = (d) => !!d && (d.__typename === "Folder" || /:folder:/.test(d.uri || ""));
+  const libraryTree = async (load, toItem, options) => {
+    const o = options || {};
+    const maxFolders = o.maxFolders || 200;
+    let folders = 0;
+    const out = [];
+    const walk = async (entries, depth, parent) => {
+      for (const d of entries) {
+        if (!d) continue;
+        if (isFolder(d)) {
+          if (!d.uri) continue;
+          out.push({ uri: d.uri, kind: "folder", name: d.name || "", subtitle: "Folder", image: "", depth, parent });
+          if (depth >= 16 || ++folders > maxFolders) continue;
+          let children = [];
+          try {
+            children = (await load(d.uri)) || [];
+          } catch (error) {
+            if (o.warn) o.warn("[spotish] folder " + d.uri + " didn't load: " + ((error && error.message) || error));
+          }
+          await walk(children, depth + 1, d.uri);
+          continue;
+        }
+        const it = toItem(d);
+        if (it) out.push(Object.assign(it, { depth, parent }));
+      }
+    };
+    await walk((await load(null)) || [], 0, "");
     return out;
   };
   const trackIdFromHref = (href) => {
@@ -719,29 +755,32 @@
     const api = {
       async library() {
         const op = "libraryV3";
-        const data = await gql(op, {
-          filters: [],
-          order: null,
-          textFilter: "",
-          features: ["LIKED_SONGS", "YOUR_EPISODES", "PRERELEASES"],
-          limit: 200,
-          offset: 0,
-          flatten: false,
-          expandedFolders: [],
-          folderUri: null,
-          includeFoldersWhenFlattening: true,
-        });
-        const items = need(op, data, "me.libraryV3.items", warn)
-          .map((entry) => {
-            const d = entry && entry.item && entry.item.data;
-            if (!d) return null;
+        const level = async (folderUri) => {
+          const data = await gql(op, {
+            filters: [],
+            order: null,
+            textFilter: "",
+            features: ["LIKED_SONGS", "YOUR_EPISODES", "PRERELEASES"],
+            limit: 200,
+            offset: 0,
+            flatten: false,
+            expandedFolders: [],
+            folderUri,
+            includeFoldersWhenFlattening: true,
+          });
+          return need(op, data, "me.libraryV3.items", warn).map((entry) => entry && entry.item && entry.item.data);
+        };
+        const items = await libraryTree(
+          level,
+          (d) => {
             if (d.__typename === "PseudoPlaylist") {
               likedImage = imageOf(d) || likedImage;
               return { uri: d.uri || "spotify:collection:tracks", kind: "collection", name: d.name || "Liked Songs", subtitle: (d.count || 0) + " songs", image: imageOf(d) || LIKED_IMAGE };
             }
             return item(d);
-          })
-          .filter(Boolean);
+          },
+          { warn },
+        );
         return { items };
       },
 
@@ -1414,6 +1453,7 @@
     paletteOf,
     lyricsOf,
     morePages,
+    libraryTree,
     item,
     track,
     likedTrack,

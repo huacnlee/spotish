@@ -209,8 +209,24 @@ export function library(): Library {
       ...ALBUMS.slice(0, rich ? 20 : 2).map(albumItem),
       artistItem(LOW_HARBOR),
       ...(rich ? ARTISTS.slice(3).map(artistItem) : []),
+      // A folder with a folder in it, as Spotify's library has them.
+      ...demoFolders(rich ? 20 : 2),
     ],
   };
+}
+
+/** Two nested library folders holding the albums after the first `from`. */
+function demoFolders(from: number): Item[] {
+  const outer = "spotify:user:demo:folder:road";
+  const inner = "spotify:user:demo:folder:night";
+  const [a, b] = ALBUMS.slice(from, from + 2).map(albumItem);
+  const folder = (uri: string, name: string, depth: number, parent: string): Item => ({ uri, kind: "folder", name, subtitle: "Folder", image: "", depth, parent });
+  return [
+    folder(outer, "Road Trips", 0, ""),
+    ...(a ? [{ ...a, depth: 1, parent: outer }] : []),
+    folder(inner, "Night Drives", 1, outer),
+    ...(b ? [{ ...b, depth: 2, parent: inner }] : []),
+  ];
 }
 
 /** A collection by URI, or null when the demo has none. */

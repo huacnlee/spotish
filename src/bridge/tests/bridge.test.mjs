@@ -646,3 +646,37 @@ test("morePages stops at the cap and says so", async () => {
   assert.equal(rest.length, 400);
   assert.ok(/cut at 450 of 5000/.test(warnings[0]), warnings[0]);
 });
+
+test("libraryTree follows nested folders in order, with depth and parent", async () => {
+  const levels = {
+    null: [{ uri: "spotify:playlist:a", name: "A" }, { __typename: "Folder", uri: "spotify:user:u:folder:f1", name: "MOJE" }, { uri: "spotify:album:z", name: "Z" }],
+    "spotify:user:u:folder:f1": [{ __typename: "Folder", uri: "spotify:user:u:folder:f2", name: "_INBOX" }, { uri: "spotify:playlist:b", name: "B" }],
+    "spotify:user:u:folder:f2": [{ uri: "spotify:playlist:c", name: "C" }],
+  };
+  const out = await B.libraryTree(async (uri) => levels[uri], (d) => ({ uri: d.uri, kind: "x", name: d.name }));
+  assert.deepEqual(
+    out.map((i) => [i.name, i.kind === "folder", i.depth, i.parent]),
+    [
+      ["A", false, 0, ""],
+      ["MOJE", true, 0, ""],
+      ["_INBOX", true, 1, "spotify:user:u:folder:f1"],
+      ["C", false, 2, "spotify:user:u:folder:f2"],
+      ["B", false, 1, "spotify:user:u:folder:f1"],
+      ["Z", false, 0, ""],
+    ],
+  );
+});
+
+test("libraryTree keeps a folder that fails to load, empty, and warns", async () => {
+  const warnings = [];
+  const out = await B.libraryTree(
+    async (uri) => {
+      if (uri) throw new Error("HTTP 500");
+      return [{ __typename: "Folder", uri: "spotify:user:u:folder:f", name: "F" }];
+    },
+    () => null,
+    { warn: (w) => warnings.push(w) },
+  );
+  assert.deepEqual(out.map((i) => i.name), ["F"]);
+  assert.match(warnings[0], /HTTP 500/);
+});

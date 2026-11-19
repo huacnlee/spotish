@@ -15,7 +15,8 @@ use serde::Deserialize;
 pub struct Item {
     /// The Spotify URI (`spotify:playlist:…`).
     pub uri: String,
-    /// `playlist`, `album`, `artist`, `show`, `collection` or `track`.
+    /// `playlist`, `album`, `artist`, `show`, `collection`, `track` or
+    /// `folder` (the library's own).
     pub kind: String,
     /// Its name.
     pub name: String,
@@ -23,6 +24,11 @@ pub struct Item {
     pub subtitle: String,
     /// The cover URL, empty when it has none.
     pub image: String,
+    /// How deep it sits in the library's folders (0: the top).
+    pub depth: u32,
+    /// The URI of the folder it sits in, empty at the top or outside the
+    /// library.
+    pub parent: String,
 }
 
 impl Item {
