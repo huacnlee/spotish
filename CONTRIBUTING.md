@@ -20,8 +20,10 @@ demand play, skips) will not be merged. Point listeners to Spotify Premium inste
 
    ```sh
    curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
-   nsh --version    # nsh 0.5.0 (f4d68f7)
+   nsh --version
    ```
+
+   `nsh --version` should print `nsh 0.5.0 (f4d68f7)`.
 
    On Windows: `$env:NSH_VERSION="v0.5.0"; irm https://nsh.dev/install.ps1 | iex`.
 
@@ -41,10 +43,13 @@ nobody else has your checkout.
 
 ## Running
 
+`nsh run` builds the engine, bundles the TSX interface and runs it on this machine. `SPOTISH_DEMO=1` selects demo
+mode, and `--target tui` runs the terminal interface:
+
 ```sh
-nsh run                       # build the engine, bundle the TSX interface, run on this machine
-SPOTISH_DEMO=1 nsh run        # demo mode: recorded sample data, no browser, no account
-nsh run --target tui          # the terminal interface
+nsh run
+SPOTISH_DEMO=1 nsh run
+nsh run --target tui
 ```
 
 - **Demo mode** (`SPOTISH_DEMO=1`) is the quickest way to work on the interface, and is what Web and mobile run.
@@ -57,13 +62,20 @@ nsh run --target tui          # the terminal interface
 
 Run these before opening a PR; CI runs the same (`.github/workflows/ci.yml`):
 
+- `nsh check`: `cargo check --all-targets`, then `tsc`.
+- `nsh build`: describes the crate and bundles the TSX (bundler diagnostics).
+- `nsh test`: `cargo test`, then the `*.test.tsx` files headless.
+- `cargo test`: the Rust crate alone.
+- `node --check src/bridge/bridge.js`: checks that the bridge parses.
+- `node --test src/bridge/*.test.mjs`: the bridge's tests, when present.
+
 ```sh
-nsh check                              # cargo check --all-targets, then tsc
-nsh build                              # describe the crate and bundle the TSX (bundler diagnostics)
-nsh test                               # cargo test, then the *.test.tsx files headless
-cargo test                             # the Rust crate alone
-node --check src/bridge/bridge.js      # the bridge parses
-node --test src/bridge/*.test.mjs      # the bridge's tests, when present
+nsh check
+nsh build
+nsh test
+cargo test
+node --check src/bridge/bridge.js
+node --test src/bridge/*.test.mjs
 ```
 
 Tests never need a Spotify account or the network: test the engine on recorded bridge payloads
