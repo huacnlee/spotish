@@ -16,6 +16,7 @@ export function fallbackIcon(kind: string): IconName {
   if (kind === "artist") return "user";
   if (kind === "album") return "disc";
   if (kind === "collection") return "heartFilled";
+  if (kind === "folder") return "folder";
   return "music";
 }
 

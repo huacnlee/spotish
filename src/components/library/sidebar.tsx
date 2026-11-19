@@ -30,6 +30,39 @@ function go(route: Route) {
   setDrawerOpen(false);
 }
 
+/** The library folders the user opened (by URI); closed by default, as in
+ * Spotify. */
+const openFolders = signal<ReadonlySet<string>>(new Set());
+function toggleFolder(uri: string) {
+  const next = new Set(openFolders());
+  if (next.has(uri)) next.delete(uri);
+  else next.add(uri);
+  openFolders.set(next);
+}
+
+/** The library rows that show: those whose folders are all open. The list
+ * comes in tree order, so a row shows when its parent folder shows and is
+ * open. */
+function visibleRows(items: readonly Item[]): Item[] {
+  const open = openFolders();
+  const shown = new Set<string>([""]);
+  const out: Item[] = [];
+  for (const item of items) {
+    const parent = item.parent ?? "";
+    if (!shown.has(parent) || (parent !== "" && !open.has(parent))) continue;
+    out.push(item);
+    if (item.kind === "folder") shown.add(item.uri);
+  }
+  return out;
+}
+
+/** Opens a library row: a folder opens or closes in place, anything else
+ * opens its page. */
+function pressRow(item: Item) {
+  if (item.kind === "folder") toggleFolder(item.uri);
+  else go({ name: "collection", uri: item.uri });
+}
+
 /** A sidebar row's height and the gap under it (h-11, and gap-1 or pb-1):
  * rows are 48pt apart in both panels. */
 const ROW_STEP = 44 + 4;
@@ -152,16 +185,20 @@ function LibraryRow(props: { item: Item | undefined; compact: boolean; index: nu
     const route = currentRoute();
     return route.name === "collection" && route.uri === uri();
   };
+  const folder = () => kind() === "folder";
+  const expanded = () => folder() && openFolders().has(uri());
+  // Rows in a folder step in under it (not on the compact rail).
+  const indent = () => (props.compact || terminal ? 0 : (props.item?.depth ?? 0) * 16);
   const playingHere = () => isPlayingContext(uri());
   const current = () => isCurrentContext(uri());
   return (
     <Pressable
       focusable={!props.keys}
-      accessibilityLabel={props.item?.name ?? ""}
+      accessibilityLabel={folder() ? `${props.item?.name ?? ""}, folder, ${expanded() ? "expanded" : "collapsed"}` : (props.item?.name ?? "")}
       selected={selected()}
       onPress={() => {
         props.keys?.pressed(props.index);
-        if (uri()) go({ name: "collection", uri: uri() });
+        if (props.item) pressRow(props.item);
       }}
       tooltip={props.compact ? <Hint label={props.item?.name ?? ""} /> : undefined}
       style={entrance}
@@ -173,6 +210,9 @@ function LibraryRow(props: { item: Item | undefined; compact: boolean; index: nu
             } ${props.keys?.isActive(props.index) ? keyRing : ""}`
       }
     >
+      <If when={indent() > 0}>
+        <View style={{ width: indent() }} />
+      </If>
       <View style={coverIn}>
         <Cover
           src={props.item?.image ?? ""}
@@ -192,6 +232,11 @@ function LibraryRow(props: { item: Item | undefined; compact: boolean; index: nu
         <If when={current() && !terminal}>
           <PlayingBars playing={playingHere()} size={12} />
         </If>
+        <If when={folder() && !terminal}>
+          <View class={`${LAYER} ${expanded() ? "" : "-rotate-90"}`}>
+            <Icon name="chevronDown" size={14} color="muted-foreground" />
+          </View>
+        </If>
       </If>
     </Pressable>
   );
@@ -207,7 +252,8 @@ function LibraryPanel(props: { compact: boolean; group?: ListGroup }) {
   const selectedIndex = () => {
     const route = currentRoute();
     if (route.name !== "collection") return -1;
-    return library.data()?.items.findIndex((i) => i.uri === route.uri) ?? -1;
+    const items = library.data()?.items;
+    return items ? visibleRows(items).findIndex((i) => i.uri === route.uri) : -1;
   };
   return (
     <View accessibilityLabel="Your Library" class={terminal ? "min-h-0 flex-1" : "relative min-h-0 flex-1 overflow-hidden rounded-(--radius-panel) border border-border bg-card"}>
@@ -226,15 +272,16 @@ function LibraryPanel(props: { compact: boolean; group?: ListGroup }) {
             // as the skeleton fades when they loaded); rows scrolled to come
             // in on their own.
             const wave = createListWave({ isTop: () => true, afterReveal: !instant });
+            const rows = () => visibleRows(lib().items);
             // Below the pages in the sidebar's region; Return opens the
             // playlist. The keyboard starts at the open one.
             const keys = createListKeys({
-              count: () => lib().items.length,
+              count: () => rows().length,
               group: props.group,
               order: () => 1,
               activate: (i) => {
-                const item = lib().items[i];
-                if (item) go({ name: "collection", uri: item.uri });
+                const item = rows()[i];
+                if (item) pressRow(item);
               },
               start: selectedIndex,
             });
@@ -246,7 +293,7 @@ function LibraryPanel(props: { compact: boolean; group?: ListGroup }) {
                 onBlur={keys.onBlur}
                 onViewableItemsChange={keys.onViewableItemsChange}
                 viewabilityConfig={KEYS_VIEWABILITY}
-                each={lib().items}
+                each={rows()}
                 keyExtractor={(i) => i.uri}
                 estimatedItemSize={48}
                 // Stops with a whole row at the top (rows are 48pt apart).
