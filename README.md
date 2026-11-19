@@ -20,6 +20,8 @@ the catalogue, your library and Spotify's ads all work exactly as Spotify intend
 
 ## Install
 
+### Stable
+
 **macOS / Linux** — run in Terminal:
 
 ```sh
@@ -38,6 +40,32 @@ You can also [download a release](https://github.com/huacnlee/spotish/releases/l
 Supported builds: Apple silicon with macOS 14 or later, x86_64 Linux with GTK 4.14 and glibc 2.39 or later
 (such as Ubuntu 24.04), and x86_64 Windows. Playback requires a [supported browser and a Spotify account](#requirements).
 On macOS, the app is not notarized; the first launch may need approval in **System Settings → Privacy & Security**.
+
+### Nightly
+
+Spotish has no nightly channel yet. Every build is a tagged [release](https://github.com/huacnlee/spotish/releases);
+to run the latest unreleased code, build from source.
+
+### From source
+
+Install Rust through [rustup](https://rustup.rs) and the `nsh` CLI 0.5.0, the version the app's crates are pinned to.
+On Linux, also install the GTK 4.14+ development packages listed in NSH's
+[installation guide](https://nsh.dev/docs/installation.md). Then clone the repository and run it:
+
+```sh
+curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
+git clone https://github.com/huacnlee/spotish.git
+cd spotish
+nsh run
+```
+
+On Windows, install the CLI in PowerShell instead:
+
+```powershell
+$env:NSH_VERSION="v0.5.0"; irm https://nsh.dev/install.ps1 | iex
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#setup) for details.
 
 ## What is NSH?
 
@@ -79,13 +107,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of the code.
 
 ## Build and run
 
-You need the `nsh` CLI (nightly) and Rust; see [CONTRIBUTING.md](CONTRIBUTING.md#setup).
+You need the `nsh` CLI 0.5.0 and Rust; see [From source](#from-source). `nsh run` builds the Rust engine, bundles
+the TSX interface and runs it on this machine. `nsh check` runs `cargo check` and `tsc`, `nsh test` runs the Rust and
+TSX tests, and `nsh build` describes the crate and bundles the interface.
 
 ```sh
-nsh run      # run on this machine (builds the Rust engine, bundles the TSX interface)
-nsh check    # cargo check + tsc
-nsh test     # cargo test + TSX tests
-nsh build    # describe the crate and bundle
+nsh run
+nsh check
+nsh test
+nsh build
 ```
 
 `SPOTISH_DEMO=1 nsh run` runs on recorded sample data, with no browser and no account.
