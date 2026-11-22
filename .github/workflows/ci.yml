@@ -40,7 +40,7 @@ jobs:
       # Use the same stable NSH release as Cargo.toml.
       - name: Install the NSH CLI (0.5.0)
         run: |
-          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
+          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # Reject a CLI that differs from the locked runtime.
