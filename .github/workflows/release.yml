@@ -51,13 +51,13 @@ jobs:
       - name: Install the NSH CLI (0.5.0)
         if: runner.os != 'Windows'
         run: |
-          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
+          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Install the NSH CLI (0.5.0, Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $env:NSH_VERSION = 'v0.5.0'
+          $env:NSH_VERSION = 'nightly'
           irm https://nsh.dev/install.ps1 | iex
           Add-Content $env:GITHUB_PATH (Join-Path $env:LOCALAPPDATA 'nsh\bin')
 
@@ -149,7 +149,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install the NSH CLI (0.5.0)
         run: |
-          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
+          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - uses: actions/download-artifact@v4
         with:
