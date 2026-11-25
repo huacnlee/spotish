@@ -378,7 +378,7 @@ test("a playlist's tracks can be sorted by date added, newest first", async () =
   await app.press("role:button[Sort tracks: Custom order]");
   await app.waitFor("role:menuitemcheckbox[Recently added]");
   await app.press("role:menuitemcheckbox[Recently added]");
-  await app.waitFor("role:button[Sort tracks: Recently added ↓]");
+  await app.waitFor("role:button[Sort tracks: Recently added, descending]");
   const after = app.texts();
   expect(after.indexOf(newest.name)).toBeLessThan(after.indexOf(first.name));
 });
@@ -395,15 +395,15 @@ test("a playlist can be sorted by title and shown compact", async () => {
 
   await app.press("role:button[Sort tracks: Custom order]");
   await app.press("role:menuitemcheckbox[Title]");
-  await app.waitFor("role:button[Sort tracks: Title ↑]");
+  await app.waitFor("role:button[Sort tracks: Title, ascending]");
   const texts = app.texts();
   expect(texts.indexOf(alphabetical[0].name)).toBeLessThan(texts.indexOf(tracks[0].name));
 
   // Compact keeps every row, with the sort kept.
-  await app.press("role:button[Sort tracks: Title ↑]");
+  await app.press("role:button[Sort tracks: Title, ascending]");
   await app.press("role:menuitemcheckbox[Compact]");
   await app.waitFor(`role:button[${alphabetical[0].name}, ${alphabetical[0].artists}]`);
-  expect(app.shows("role:button[Sort tracks: Title ↑]")).toBe(true);
+  expect(app.shows("role:button[Sort tracks: Title, ascending]")).toBe(true);
 });
 
 test("choosing the sort in use again runs it the other way", async () => {
@@ -419,14 +419,14 @@ test("choosing the sort in use again runs it the other way", async () => {
 
   await app.press("role:button[Sort tracks: Custom order]");
   await app.press("role:menuitemcheckbox[Title]");
-  await app.waitFor("role:button[Sort tracks: Title ↑]");
+  await app.waitFor("role:button[Sort tracks: Title, ascending]");
   const first = app.texts();
   expect(first.indexOf(up[0].name)).toBeLessThan(first.indexOf(down[0].name));
 
-  await app.press("role:button[Sort tracks: Title ↑]");
+  await app.press("role:button[Sort tracks: Title, ascending]");
   // The entry in use carries its direction.
-  await app.press("role:menuitemcheckbox[Title ↑]");
-  await app.waitFor("role:button[Sort tracks: Title ↓]");
+  await app.press("role:menuitemcheckbox[Title, ascending]");
+  await app.waitFor("role:button[Sort tracks: Title, descending]");
   const second = app.texts();
   expect(second.indexOf(down[0].name)).toBeLessThan(second.indexOf(up[0].name));
 });

@@ -15,8 +15,9 @@ Spotish is licensed to everyone under the [Apache License 2.0](LICENSE-APACHE).
 
 ## Third-party artwork
 
-The interface's icons are [Tabler Icons](https://tabler.io/icons) 3.19.0,
-Copyright (c) 2020-2024 Paweł Kuna, under the MIT License.
+The interface's icons are [Tabler Icons](https://tabler.io/icons) 3.53.0 (through
+[nsh-icon](https://github.com/huacnlee/nsh-icon)'s `nsh-icon-tabler`), Copyright (c)
+2020-2024 Paweł Kuna, under the MIT License.
 
 ## Special grant to Spotify
 
