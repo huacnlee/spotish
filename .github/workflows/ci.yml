@@ -37,11 +37,10 @@ jobs:
         with:
           node-version: 22
 
-      # Use the same stable NSH release as Cargo.toml.
-      - name: Install the NSH CLI (0.5.0)
-        run: |
-          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # The CLI of the commit Cargo.lock pins: the tag's prebuilt CLI while the tag still points there, otherwise one
+      # built from that commit (`nightly` moves every night).
+      - name: Install the locked NSH CLI
+        run: bash .github/install-nsh.sh
 
       # Reject a CLI that differs from the locked runtime.
       - name: Compare the CLI with the locked NSH

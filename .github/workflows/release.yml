@@ -47,19 +47,10 @@ jobs:
         with:
           key: release-${{ matrix.target }}
 
-      # Use the same stable NSH release as Cargo.toml.
-      - name: Install the NSH CLI (0.5.0)
-        if: runner.os != 'Windows'
-        run: |
-          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-      - name: Install the NSH CLI (0.5.0, Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $env:NSH_VERSION = 'nightly'
-          irm https://nsh.dev/install.ps1 | iex
-          Add-Content $env:GITHUB_PATH (Join-Path $env:LOCALAPPDATA 'nsh\bin')
+      # The CLI of the commit Cargo.lock pins: the tag's prebuilt CLI while the tag still points there, otherwise one
+      # built from that commit (`nightly` moves every night).
+      - name: Install the locked NSH CLI
+        run: bash .github/install-nsh.sh
 
       # Reject a CLI that differs from the locked runtime.
       - name: Compare the CLI with the locked NSH
@@ -69,7 +60,6 @@ jobs:
           locked="$(tr -d '\r' < Cargo.lock | grep -A2 '^name = "nsh-core"$' | sed -n 's/^source = ".*#\([0-9a-f]*\)"$/\1/p')"
           echo "nsh CLI: $cli, Cargo.lock: $locked"
           [ -n "$cli" ] && [ -n "$locked" ] || { echo "::error::Could not read the CLI or the locked NSH commit."; exit 1; }
-          [ -n "$cli" ] && [ -n "$locked" ] || exit 1
           case "$locked" in
             "$cli"*) ;;
             *) echo "::error::NSH CLI ($cli) differs from Cargo.lock ($locked)."; exit 1 ;;
@@ -147,10 +137,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Install the NSH CLI (0.5.0)
-        run: |
-          curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      # `nsh update-manifest`. Building the locked CLI needs clang for QuickJS.
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang libclang-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install the locked NSH CLI
+        run: bash .github/install-nsh.sh
       - uses: actions/download-artifact@v4
         with:
           path: assets
