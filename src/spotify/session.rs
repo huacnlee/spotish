@@ -324,6 +324,8 @@ const COOKIE_EVERY: Duration = Duration::from_secs(8);
 const WIDEVINE_GRACE: Duration = Duration::from_secs(120);
 /// A sign-in window that ends sooner did not let anyone sign in.
 const SIGN_IN_MIN: Duration = Duration::from_secs(2);
+/// How often the sign-in loop looks for a new session cookie.
+const SIGN_IN_POLL: Duration = Duration::from_secs(1);
 
 struct Runner {
     queue: mpsc::Receiver<Request>,
@@ -465,17 +467,21 @@ impl Runner {
     // --- Signing in -----------------------------------------------------------
 
     /// Runs the sign-in window: an ordinary browser window, with no
-    /// automation and no bridge. The user signs in and closes the window; a
-    /// window the user closes is a clean quit, which flushes the session's
-    /// cookies to disk, so the login survives a restart.
+    /// automation and no bridge. Once a new session cookie reaches the
+    /// profile's cookie database the window is closed for the user (a
+    /// SIGTERM is a clean quit, which flushes the rest of the cookies); the
+    /// user closing it first still works the same way.
     fn sign_in(&mut self) -> Next {
         let Some(binary) = chrome::find_browser() else { return self.failed(Runner::no_browser()) };
         log::info!("sign-in: opening the login window");
         self.health(Health::signing_in());
+        let profile = self.paths.profile();
+        let before = import::session_cookie_stamp(&profile);
         let mut browser = match Browser::start_sign_in(&binary, &self.paths) {
             Ok(browser) => browser,
             Err(failure) => return self.failed(failure),
         };
+        let mut checked = Instant::now();
         loop {
             match self.queue.recv_timeout(Duration::from_millis(150)) {
                 Ok(Request::Command { reply, .. }) => {
@@ -495,6 +501,16 @@ impl Runner {
                 Ok(Request::SignIn | Request::Retry | Request::Evaluated { .. } | Request::Cookies(_)) => {}
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
                 Err(mpsc::RecvTimeoutError::Disconnected) => return Next::Exit(None),
+            }
+            if browser.exited().is_none() && checked.elapsed() >= SIGN_IN_POLL {
+                checked = Instant::now();
+                if new_session(before, import::session_cookie_stamp(&profile)) {
+                    log::info!("sign-in: session cookie saved, closing the login window");
+                    drop(browser);
+                    import::settle(&self.paths, "signed in");
+                    self.backoff.reset();
+                    return Next::Player;
+                }
             }
             if let Some(status) = browser.exited() {
                 let lived = browser.uptime();
@@ -1008,6 +1024,16 @@ fn has_session_cookie(answer: &Value) -> bool {
     })
 }
 
+/// Whether the cookie database now holds a session cookie newer than the
+/// one it had when the sign-in window opened.
+fn new_session(before: Option<i64>, now: Option<i64>) -> bool {
+    match (before, now) {
+        (_, None) => false,
+        (None, Some(_)) => true,
+        (Some(b), Some(n)) => n > b,
+    }
+}
+
 /// What a sign-in window's end means: closed by the user after it had run a
 /// while, or a failure (it never opened properly, or crashed).
 fn sign_in_outcome(success: bool, code: Option<i32>, lived: Duration, log: &Path) -> Result<(), StartError> {
@@ -1091,6 +1117,15 @@ mod tests {
         assert!(!has_session_cookie(&cookies("sp_dc", ".example.com", "x")));
         assert!(!has_session_cookie(&cookies("sp_t", ".spotify.com", "x")));
         assert!(!has_session_cookie(&json!({})));
+    }
+
+    #[test]
+    fn only_a_newer_session_cookie_ends_sign_in() {
+        assert!(!new_session(None, None));
+        assert!(new_session(None, Some(1)));
+        assert!(!new_session(Some(5), Some(5)));
+        assert!(new_session(Some(5), Some(6)));
+        assert!(!new_session(Some(5), None));
     }
 
     #[test]
