@@ -156,7 +156,7 @@ export function SigningInDialog() {
           Log in to Spotify
         </Text>
         <Text class="text-center text-sm text-muted-foreground">
-          Log in in the Spotify window, then close it to finish.
+          Log in in the Spotify window. It closes by itself once you are signed in.
         </Text>
         <ActionButton label="Cancel" onPress={cancelSignIn} />
       </View>

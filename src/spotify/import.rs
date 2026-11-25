@@ -65,6 +65,34 @@ pub fn has_cookies(profile: &Path) -> bool {
     COOKIE_DBS.iter().any(|db| profile.join(db).is_file())
 }
 
+/// The newest `creation_utc` of Spotify's session cookie (`sp_dc`) in
+/// `profile`'s cookie database, read-only, or `None` when there is none.
+/// Chromium writes new cookies to disk within about 30 s, without closing,
+/// and keeps the value encrypted, so either column counts as a value.
+pub fn session_cookie_stamp(profile: &Path) -> Option<i64> {
+    COOKIE_DBS.iter().find_map(|db| {
+        let path = profile.join(db);
+        if !path.is_file() {
+            return None;
+        }
+        let conn = rusqlite::Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .ok()?;
+        let _ = conn.busy_timeout(std::time::Duration::from_millis(200));
+        conn.query_row(
+            "SELECT max(creation_utc) FROM cookies WHERE name = 'sp_dc' \
+             AND (host_key = 'spotify.com' OR host_key LIKE '%.spotify.com') \
+             AND (length(value) > 0 OR length(encrypted_value) > 0)",
+            [],
+            |r| r.get::<_, Option<i64>>(0),
+        )
+        .ok()
+        .flatten()
+    })
+}
+
 /// Imports the login of `source` (a Chromium profile directory) into
 /// `paths`'s profile, unless the import is settled or Spotish has a login of
 /// its own.
@@ -297,6 +325,27 @@ mod tests {
         assert_eq!(read_cookie(&to), "fresh");
         assert!(!sibling(&to, "spotish-staging").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reads_the_session_cookie_stamp() {
+        let profile = std::env::temp_dir().join(format!("spotish-stamp-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&profile);
+        assert_eq!(session_cookie_stamp(&profile), None);
+        let db = profile.join(COOKIE_DBS[0]);
+        std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE cookies (host_key TEXT, name TEXT, value TEXT, encrypted_value BLOB, creation_utc INTEGER);
+             INSERT INTO cookies VALUES ('.spotify.com', 'sp_t', '', x'01', 9);
+             INSERT INTO cookies VALUES ('.example.com', 'sp_dc', 'x', x'', 8);
+             INSERT INTO cookies VALUES ('.spotify.com', 'sp_dc', '', x'', 7);",
+        )
+        .unwrap();
+        assert_eq!(session_cookie_stamp(&profile), None);
+        conn.execute("INSERT INTO cookies VALUES ('.spotify.com', 'sp_dc', '', x'0102', 5)", []).unwrap();
+        assert_eq!(session_cookie_stamp(&profile), Some(5));
+        let _ = std::fs::remove_dir_all(&profile);
     }
 
     #[test]
