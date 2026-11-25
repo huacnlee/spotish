@@ -3,7 +3,7 @@
 import { signal, Text, View } from "nsh";
 import { Button, Menu, MenuItem, MenuSeparator } from "nsh/base";
 import { focusRing, menuItem, popupSurface, terminal } from "../ui/controls";
-import { Icon } from "../ui/icons";
+import { Icon, type IconColor } from "../ui/icons";
 import { menuPopupHidden, menuPopupLeaving, menuPopupStyle } from "../ui/menu";
 import { chooseSort, directionOf, TRACK_SORTS, trackReversed, trackSort, trackView, type TrackView } from "./track-sort";
 
@@ -12,8 +12,19 @@ const VIEWS: { id: TrackView; label: string }[] = [
   { id: "list", label: "List" },
 ];
 
-/** The way the chosen order runs, as an arrow (none for custom order). */
-const arrow = () => (trackSort() === "custom" ? "" : directionOf(trackSort(), trackReversed()) === "asc" ? "↑" : "↓");
+/** The way the chosen order runs (none for custom order). */
+const direction = () => (trackSort() === "custom" ? null : directionOf(trackSort(), trackReversed()));
+/** It as a terminal's arrow, which draws no icons. */
+const arrow = () => (direction() === null ? "" : direction() === "asc" ? "↑" : "↓");
+/** It in words, for screen readers. */
+const spoken = () => (direction() === null ? "" : direction() === "asc" ? "ascending" : "descending");
+
+/** The way the order runs, as an arrow icon (a terminal's text arrow). */
+const Arrow = (props: { size: number; color: IconColor }) => (
+  <If when={direction()}>
+    {(dir) => (terminal ? <Text class="text-sm text-popover-foreground">{arrow()}</Text> : <Icon name={dir() === "asc" ? "arrowUp" : "arrowDown"} size={props.size} color={props.color} />)}
+  </If>
+);
 
 const Heading = (props: { label: string }) => (
   <Text class="px-3 pb-1 pt-2 text-xs font-bold text-muted-foreground">{props.label}</Text>
@@ -38,7 +49,7 @@ export function TrackSortMenu() {
         popupEndingStyle={menuPopupLeaving("bottom", "end")}
         trigger={
           <Button
-            accessibilityLabel={`Sort tracks: ${label()} ${arrow()}`.trim()}
+            accessibilityLabel={spoken() ? `Sort tracks: ${label()}, ${spoken()}` : `Sort tracks: ${label()}`}
             selected={open()}
             class={
               terminal
@@ -46,8 +57,9 @@ export function TrackSortMenu() {
                 : `group h-7 flex-row items-center gap-1 rounded-(--radius-inset) px-2 transition duration-200 ease-out hover:bg-row-hover selected:bg-secondary motion-reduce:transition-none ${focusRing}`
             }
           >
-            <Text class="text-xs font-medium text-muted-foreground group-hover:text-foreground">{`${label()} ${arrow()}`.trim()}</Text>
+            <Text class="text-xs font-medium text-muted-foreground group-hover:text-foreground">{terminal ? `${label()} ${arrow()}`.trim() : label()}</Text>
             <If when={!terminal}>
+              <Arrow size={12} color="muted-foreground" />
               <Icon name="chevronDown" size={12} color="muted-foreground" />
             </If>
           </Button>
@@ -55,10 +67,15 @@ export function TrackSortMenu() {
       >
         <Heading label="Sort by" />
         {TRACK_SORTS.map((sort) => (
-          <MenuItem onSelect={() => chooseSort(sort.id)} checked={trackSort() === sort.id} class={menuItem}>
+          <MenuItem
+            onSelect={() => chooseSort(sort.id)}
+            checked={trackSort() === sort.id}
+            accessibilityLabel={trackSort() === sort.id && spoken() ? `${sort.label}, ${spoken()}` : sort.label}
+            class={menuItem}
+          >
             <Text class="flex-1 text-sm text-popover-foreground">{sort.label}</Text>
-            <If when={trackSort() === sort.id && trackSort() !== "custom"}>
-              <Text class="text-sm text-popover-foreground">{arrow()}</Text>
+            <If when={trackSort() === sort.id}>
+              <Arrow size={14} color="popover-foreground" />
             </If>
             <If when={trackSort() === sort.id && !terminal}>
               <Icon name="check" size={14} color="popover-foreground" />

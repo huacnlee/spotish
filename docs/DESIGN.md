@@ -435,11 +435,11 @@ cover, title, artist, a 36pt play button. It opens Now Playing.
 
 ### Icons
 
-`src/components/ui/icons.tsx`: [Tabler Icons](https://tabler.io/icons) 3.19
-(MIT). Outline at a 1.5pt stroke; Filled for the transport (play, pause,
-skip) and the heart. One family; a missing glyph comes from Tabler, never
-drawn by hand. Drawn as SVG in a token's colour, redrawn when the appearance
-changes. Sizes: 18 in controls, 22 for sidebar nav and Now Playing, 24 for
+`src/components/ui/icons.tsx`: [Tabler Icons](https://tabler.io/icons) from
+nsh-icon's `nsh-icon-tabler` (MIT). Outline at a 1.5pt stroke; Filled for the
+transport (play, pause, skip) and the heart. One family; a missing glyph comes
+from Tabler, never drawn by hand or as a character. Drawn by nsh-icon's `Icon`
+in a token's text colour. Sizes: 18 in controls, 22 for sidebar nav and Now Playing, 24 for
 phone tabs, 16 in menus, 12–14 for marks (check, ↗, chevron).
 
 The playing mark (`src/components/ui/playing.tsx`) is three bars drawn by a

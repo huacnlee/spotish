@@ -21,5 +21,9 @@
     "infoPlist": {
       "NSAudioCaptureUsageDescription": "Spotish listens to the music it plays so its lights move with the beat. The sound never leaves this Mac."
     }
+  },
+  "dependencies": {
+    "nsh-icon": "^0.2.1",
+    "nsh-icon-tabler": "^0.2.1"
   }
 }
