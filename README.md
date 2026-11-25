@@ -48,12 +48,13 @@ to run the latest unreleased code, build from source.
 
 ### From source
 
-Install Rust through [rustup](https://rustup.rs) and the `nsh` CLI 0.5.0, the version the app's crates are pinned to.
+Install Rust through [rustup](https://rustup.rs) and the `nsh` CLI built from the NSH commit the app's crates are
+locked to (the `nightly` tag while it still points there; see [CONTRIBUTING.md](CONTRIBUTING.md#setup)).
 On Linux, also install the GTK 4.14+ development packages listed in NSH's
 [installation guide](https://nsh.dev/docs/installation.md). Then clone the repository and run it:
 
 ```sh
-curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=v0.5.0 sh
+curl -fsSL https://nsh.dev/install.sh | NSH_VERSION=nightly sh
 git clone https://github.com/huacnlee/spotish.git
 cd spotish
 nsh run
@@ -62,7 +63,7 @@ nsh run
 On Windows, install the CLI in PowerShell instead:
 
 ```powershell
-$env:NSH_VERSION="v0.5.0"; irm https://nsh.dev/install.ps1 | iex
+$env:NSH_VERSION="nightly"; irm https://nsh.dev/install.ps1 | iex
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#setup) for details.
@@ -107,7 +108,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout of the code.
 
 ## Build and run
 
-You need the `nsh` CLI 0.5.0 and Rust; see [From source](#from-source). `nsh run` builds the Rust engine, bundles
+You need the `nsh` CLI matching the locked NSH commit and Rust; see [From source](#from-source). `nsh run` builds the Rust engine, bundles
 the TSX interface and runs it on this machine. `nsh check` runs `cargo check` and `tsc`, `nsh test` runs the Rust and
 TSX tests, and `nsh build` describes the crate and bundles the interface.
 
