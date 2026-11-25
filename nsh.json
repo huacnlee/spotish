@@ -13,7 +13,7 @@
     }
   },
   "rust": ".",
-  "minRuntime": "0.5.0",
+  "minRuntime": "0.7.0",
   "updater": {
     "github": "huacnlee/spotish"
   },
