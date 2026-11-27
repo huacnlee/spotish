@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "nsh-icon": "^0.2.1",
-    "nsh-icon-tabler": "^0.2.1"
+    "nsh-icon-tabler": "^0.2.1",
+    "nsmetry": "^0.1.0"
   }
 }

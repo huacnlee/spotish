@@ -22,6 +22,17 @@
       "dependencies": [
         "nsh-icon"
       ]
+    },
+    {
+      "name": "nsmetry",
+      "version": "0.1.0",
+      "source": "crates.io",
+      "checksum": "sha256-af276faced021a9b34d191574b326a03ad5654808823edd9ed6a7506a5046dcd",
+      "dir": "nsmetry/0.1.0",
+      "module": "nsmetry/native",
+      "exports": {
+        "nsmetry": "src/index.ts"
+      }
     }
   ]
 }

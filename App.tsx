@@ -5,6 +5,7 @@
 // and state live under `src/`.
 
 import { cleanup, keymap, mount, View } from "nsh";
+import { navStackPath, useNsMetry, useScreenTracking } from "nsmetry";
 import { layout } from "./src/components/layout";
 import { NowPlayingSheet } from "./src/components/player/now-playing";
 import { Toaster } from "./src/components/ui/feedback";
@@ -14,11 +15,13 @@ import { bindRegionKeys } from "./src/components/ui/regions";
 import { DesktopShell } from "./src/shells/desktop";
 import { PhoneShell } from "./src/shells/phone";
 import { TerminalShell } from "./src/shells/terminal";
+import { nav } from "./src/nav";
 import { installDesktopShell } from "./src/platform/desktop";
 import { installMediaControls } from "./src/platform/media";
 import { followSystemTheme } from "./src/platform/theme";
 import { checkForUpdates } from "./src/platform/updater";
 import { positionAt } from "./src/backend/types";
+import { analytics, routePath } from "./src/state/analytics";
 import { isDemo } from "./src/state/engine";
 import { announce } from "./src/state/feedback";
 import { setNowPlayingOpen, setShortcutsOpen } from "./src/state/overlays";
@@ -80,6 +83,10 @@ function Shortcuts() {
 
 function App() {
   installPlatform();
+  // Anonymous screen views (`/home`, `/album`, never an id), sent in
+  // batches and flushed when the app goes to the background or quits.
+  useNsMetry(analytics);
+  useScreenTracking(analytics, navStackPath(nav, routePath));
   return (
     <View class="flex-1 bg-sidebar">
       <Shortcuts />
