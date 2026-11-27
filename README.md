@@ -132,6 +132,13 @@ Spotify Free can shuffle-play playlists, albums and artists but cannot play a ch
 song shuffles its playlist, as Spotify's web player does. Ads play as Spotify serves them. **Premium** plays any track
 on demand and has no ads.
 
+## Usage statistics
+
+Spotish counts which pages are opened (`/home`, `/search`, `/album`, never which album) and which errors people run into,
+with [NsMetry](https://github.com/huacnlee/nsmetry). It sends no account, track, playlist or search text, and no cookies.
+Each install has a random id, kept in the app's own storage, that the server hashes before storing. Demo mode sends
+nothing.
+
 ## Benchmarks
 
 ### Memory

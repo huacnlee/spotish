@@ -6,6 +6,7 @@
 import { platform, signal } from "nsh";
 import { type ToastEntry, ToastManager } from "nsh/base";
 import { type BackendError, errorOf } from "../backend/types";
+import { trackError } from "./analytics";
 
 /** Every message the app shows as a toast. */
 export const MESSAGES = {
@@ -83,6 +84,7 @@ export function announce(text: string, action?: ToastAction): void {
 export function report(id: MessageId, error: unknown, action?: ToastAction): BackendError {
   const parsed = errorOf(error);
   console.warn(`spotish: ${id}: ${parsed.code}: ${parsed.message}`);
+  trackError(id, parsed.code);
   notify(id, action);
   return parsed;
 }
