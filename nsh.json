@@ -3,7 +3,14 @@
   "id": "dev.huacnlee.spotish",
   "version": "0.1.5",
   "build": 1,
-  "icon": "icon.png",
+  "icon": {
+    "macos": "icon-macos.png",
+    "windows": "icon-rounded.png",
+    "linux": "icon-rounded.png",
+    "web": "icon-rounded.png",
+    "ios": "icon.png",
+    "android": "icon.png"
+  },
   "appearance": "system",
   "theme": "theme.json",
   "window": {
