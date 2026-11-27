@@ -1,7 +1,7 @@
 {
   "name": "Spotish",
   "id": "dev.huacnlee.spotish",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "build": 1,
   "icon": {
     "macos": "icon-macos.png",
